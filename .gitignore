@@ -1,10 +1,29 @@
+# Segredos
 .env
+.env.*
+!.env.example
+
+# Python
 .venv/
+venv/
 __pycache__/
 *.pyc
+dist/
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+coverage/
+
+# Saídas dos evals
 tests/eval/out/
-EOF
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.tmp
+
 .claude
