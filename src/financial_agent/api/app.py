@@ -15,6 +15,7 @@ from financial_agent.api.routes import router
 from financial_agent.config import get_settings
 from financial_agent.graph.builder import build_graph
 from financial_agent.logging import configure_logging, request_id_var
+from financial_agent.rag.vectorstore import close_vectorstore, get_embeddings, get_vectorstore
 from financial_agent.tools import get_tools
 
 PingFn = Callable[[], Awaitable[bool]]
@@ -29,6 +30,7 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.LOG_LEVEL)
     pool = await db.open_pool(settings.DATABASE_URL)
+    vectorstore = get_vectorstore(settings, get_embeddings(settings))
     try:
         checkpointer = await db.setup_checkpointer(pool)
         llm = ChatOpenAI(
@@ -37,7 +39,6 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
             timeout=settings.LLM_TIMEOUT_SECONDS,
             api_key=settings.OPENAI_API_KEY,
         )
-        vectorstore = None  # a US1 conecta o PGVector aqui
         tools = get_tools(settings, vectorstore)
         # Compilado uma única vez; o estado da conversa vive só no checkpointer.
         app.state.graph = build_graph(checkpointer, llm, tools)
@@ -48,6 +49,7 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.ping = ping
         yield
     finally:
+        await close_vectorstore(vectorstore)
         await pool.close()
 
 

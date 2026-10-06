@@ -1,10 +1,17 @@
 """Nó do agente (LLM com ferramentas) e coleta das fontes do turno."""
 
+import re
 from collections.abc import Sequence
 from typing import Any, Protocol
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, TypeAdapter
 
@@ -12,6 +19,11 @@ from financial_agent.graph.prompts import AGENT_SYSTEM_PROMPT
 from financial_agent.graph.state import GraphState, SourceCitation
 
 _source_adapter: TypeAdapter[SourceCitation] = TypeAdapter(SourceCitation)
+
+# Trechos de documento chegam como "[n] título (origem)" (tools/document_search.py) e o agente
+# os cita como [n], [n, m] ou [n; m] na resposta.
+_FIRST_MARKER = re.compile(r"^\[(\d+)\] ")
+_CITATION = re.compile(r"\[(\d+(?:\s*[,;]\s*\d+)*)\]")
 
 
 class AgentNode(Protocol):
@@ -29,7 +41,7 @@ def make_agent_node(llm: BaseChatModel, tools: Sequence[BaseTool]) -> AgentNode:
     return agent
 
 
-def _current_turn(messages: Sequence[BaseMessage]) -> Sequence[BaseMessage]:
+def current_turn(messages: Sequence[BaseMessage]) -> Sequence[BaseMessage]:
     for index in range(len(messages) - 1, -1, -1):
         if isinstance(messages[index], HumanMessage):
             return messages[index + 1 :]
@@ -48,10 +60,28 @@ def _to_sources(artifact: Any) -> list[SourceCitation]:
     return sources
 
 
+def cited_markers(text: str) -> set[int]:
+    return {int(n) for group in _CITATION.findall(text) for n in re.split(r"\s*[,;]\s*", group)}
+
+
 def collect_sources(state: GraphState) -> dict[str, Any]:
-    """Junta em `turn_sources` os artefatos dos `ToolMessage`s do turno atual."""
+    """Junta em `turn_sources` os artefatos dos `ToolMessage`s do turno atual.
+
+    Trechos de documento só entram se a resposta final citar o número deles: a busca pode
+    trazer trechos parecidos que não respondem à pergunta, e esses não são fontes.
+    """
+    turn = current_turn(state["messages"])
+    final = next((m for m in reversed(turn) if isinstance(m, AIMessage)), None)
+    cited = cited_markers(final.text) if final is not None else set()
+
     sources: list[SourceCitation] = []
-    for message in _current_turn(state["messages"]):
-        if isinstance(message, ToolMessage):
-            sources.extend(_to_sources(message.artifact))
+    for message in turn:
+        if not isinstance(message, ToolMessage):
+            continue
+        match = _FIRST_MARKER.match(message.text)
+        first = int(match.group(1)) if match else None
+        for offset, source in enumerate(_to_sources(message.artifact)):
+            if source.type == "document" and (first is None or first + offset not in cited):
+                continue
+            sources.append(source)
     return {"turn_sources": sources}

@@ -30,6 +30,16 @@ Returns:
 
 - Artefato: `list[DocumentSource]`.
 - Regras: `query` com 1–500 caracteres, k=4, `score >= RAG_MIN_SCORE`.
+- Citações: cada busca do turno numera seus trechos em uma faixa própria ([1–4], [5–8], ...)
+  e o agente cita os números que usou (`[1]`, `[1, 3]`). Só os trechos citados na resposta
+  final entram em `sources`; os trechos parecidos que não respondem à pergunta ficam de fora,
+  e uma resposta "não encontrei" sai com `sources == []`. O limiar sozinho não separa esses
+  casos: na calibração com `grounding.jsonl`, o trecho certo da pergunta respondível mais
+  difícil teve 0.41 e o melhor trecho de uma pergunta sem resposta chegou a 0.63.
+- Trava de fundamentação (nó `enforce_grounding`): se o turno buscou documentos, não citou
+  nenhum trecho e não tem outra fonte, a resposta é trocada por `NOT_FOUND_MESSAGE` e o evento
+  `ungrounded_answer_replaced` vai para o log. O prompt sozinho não basta: no eval, o modelo
+  às vezes ignorava os trechos e respondia de cabeça.
 
 ## `get_currency_quote(base: str, quote: str = "BRL") -> str`
 

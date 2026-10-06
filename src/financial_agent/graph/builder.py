@@ -1,4 +1,4 @@
-"""Montagem do grafo: START → agent ⇄ tools → collect_sources → END."""
+"""Montagem do grafo: START → agent ⇄ tools → collect_sources → enforce_grounding → END."""
 
 from collections.abc import Sequence
 from typing import Any
@@ -11,6 +11,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from financial_agent.graph.nodes.agent import collect_sources, make_agent_node
+from financial_agent.graph.nodes.grounding import enforce_grounding
 from financial_agent.graph.state import GraphState
 
 # Usado no config de cada invocação (agent ⇄ tools não pode girar indefinidamente).
@@ -31,12 +32,14 @@ def build_graph(
     builder.add_node("agent", make_agent_node(llm, tools))
     builder.add_node("tools", ToolNode(list(tools)))
     builder.add_node("collect_sources", collect_sources)
+    builder.add_node("enforce_grounding", enforce_grounding)
 
     builder.add_edge(START, "agent")
     builder.add_conditional_edges(
         "agent", tools_condition, {"tools": "tools", END: "collect_sources"}
     )
     builder.add_edge("tools", "agent")
-    builder.add_edge("collect_sources", END)
+    builder.add_edge("collect_sources", "enforce_grounding")
+    builder.add_edge("enforce_grounding", END)
 
     return builder.compile(checkpointer=checkpointer)

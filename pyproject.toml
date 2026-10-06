@@ -46,6 +46,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 addopts = "-m 'not eval'"
+filterwarnings = ["ignore:Relevance scores must be between 0 and 1"]
 markers = [
     "eval: avaliações com o LLM real (custam tokens; rodar com -m eval)",
     "integration: testes que exigem Docker/Postgres (testcontainers)",
