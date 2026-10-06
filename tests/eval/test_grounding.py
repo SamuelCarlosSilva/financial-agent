@@ -8,8 +8,6 @@ reingerido antes da execução (a ingestão é idempotente).
 
 import asyncio
 import json
-import re
-import unicodedata
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -18,19 +16,24 @@ import pytest
 from fastapi.testclient import TestClient
 
 from financial_agent.api.app import create_app
-from financial_agent.config import get_settings
 from financial_agent.logging import truncate
-from financial_agent.rag.ingest import ingest_directory, load_directory, split_documents
-from financial_agent.rag.vectorstore import close_vectorstore, get_embeddings, get_vectorstore
+from financial_agent.rag.ingest import load_directory, split_documents
 from financial_agent.tools.document_search import SNIPPET_MAX_CHARS
+from tests.eval.common import (
+    DOCS_DIR,
+    OUT_DIR,
+    ROOT,
+    has_openai_key,
+    ingest_docs,
+    load_jsonl,
+    normalize,
+)
 from tests.eval.judge import Verdict, aggregate, judge
 
 pytestmark = pytest.mark.eval
 
-ROOT = Path(__file__).resolve().parents[2]
 DATASET = Path(__file__).parent / "datasets" / "grounding.jsonl"
-FAILURES = Path(__file__).parent / "out" / "grounding_failures.jsonl"
-DOCS_DIR = ROOT / "data" / "docs"
+FAILURES = OUT_DIR / "grounding_failures.jsonl"
 
 NOT_FOUND_MARKERS = (
     "nao encontrei",
@@ -40,14 +43,6 @@ NOT_FOUND_MARKERS = (
     "nao tenho informac",
     "nao consta",
 )
-
-
-def normalize(text: str) -> str:
-    """Minúsculas, sem acentos, espaços colapsados e vírgula decimal ("22.5" → "22,5")."""
-    text = unicodedata.normalize("NFKD", text.casefold())
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"(\d)\.(\d)", r"\1,\2", text)
-    return " ".join(text.split())
 
 
 def fact_present(fact: str | list[str], answer: str) -> bool:
@@ -94,32 +89,17 @@ def without_not_found_claims(verdict: Verdict) -> Verdict:
     return verdict.model_copy(update={"claims": claims})
 
 
-def load_dataset() -> list[dict[str, Any]]:
-    lines = DATASET.read_text(encoding="utf-8").splitlines()
-    return [json.loads(line) for line in lines if line.strip()]
-
-
-async def _ingest_docs() -> None:
-    settings = get_settings()
-    vectorstore = get_vectorstore(settings, get_embeddings(settings))
-    try:
-        await ingest_directory(DOCS_DIR, vectorstore)
-    finally:
-        await close_vectorstore(vectorstore)
-
-
 @pytest.fixture(scope="module")
 def results() -> Iterator[list[dict[str, Any]]]:
     """Roda o dataset inteiro uma vez (cada pergunta em uma thread nova) e julga as respostas."""
-    get_settings.cache_clear()
-    if not get_settings().OPENAI_API_KEY.get_secret_value():
+    if not has_openai_key():
         pytest.skip("OPENAI_API_KEY não configurada")
-    asyncio.run(_ingest_docs())
+    asyncio.run(ingest_docs())
 
     texts = chunk_texts()
     rows: list[dict[str, Any]] = []
     with TestClient(create_app()) as client:
-        for case in load_dataset():
+        for case in load_jsonl(DATASET):
             response = client.post("/v1/chat", json={"message": case["question"]})
             assert response.status_code == 200, response.text
             body = response.json()
