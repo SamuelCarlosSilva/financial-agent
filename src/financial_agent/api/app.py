@@ -14,6 +14,7 @@ from financial_agent.api.errors import register_error_handlers
 from financial_agent.api.routes import router
 from financial_agent.config import get_settings
 from financial_agent.graph.builder import build_graph
+from financial_agent.graph.nodes.guardrail import make_guardrail_node
 from financial_agent.logging import configure_logging, request_id_var
 from financial_agent.rag.vectorstore import close_vectorstore, get_embeddings, get_vectorstore
 from financial_agent.tools import get_tools
@@ -39,9 +40,17 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
             timeout=settings.LLM_TIMEOUT_SECONDS,
             api_key=settings.OPENAI_API_KEY,
         )
+        guardrail_llm = ChatOpenAI(
+            model=settings.GUARDRAIL_MODEL,
+            temperature=0,
+            timeout=settings.LLM_TIMEOUT_SECONDS,
+            api_key=settings.OPENAI_API_KEY,
+        )
         tools = get_tools(settings, vectorstore)
         # Compilado uma única vez; o estado da conversa vive só no checkpointer.
-        app.state.graph = build_graph(checkpointer, llm, tools)
+        app.state.graph = build_graph(
+            checkpointer, llm, tools, guardrail=make_guardrail_node(guardrail_llm)
+        )
 
         async def ping() -> bool:
             return await db.ping(pool)

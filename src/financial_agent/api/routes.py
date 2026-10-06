@@ -60,7 +60,7 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     final = next((m for m in reversed(turn) if isinstance(m, AIMessage)), None)
     answer = final.text if final is not None else ""
     scope_decision = state.get("scope")
-    # Sem guardrail (até a US2), todo turno é tratado como em escopo.
+    # Grafos sem guardrail (testes do laço do agente) tratam todo turno como em escopo.
     scope: ScopeLabel = scope_decision.label if scope_decision is not None else "in_scope"
     sources: list[SourceCitation] = state.get("turn_sources") or []
 
@@ -70,6 +70,7 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
         thread_id=str(thread_id),
         request_id=request_id_var.get(),
         scope_label=scope,
+        scope_reason=scope_decision.reason if scope_decision is not None else None,
         tools_called=tools_called,
         sources=[_source_ref(source) for source in sources],
         latency_ms=round((time.perf_counter() - started) * 1000),
