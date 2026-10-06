@@ -7,8 +7,9 @@ Assistente financeiro conversacional exposto como API REST. Construído com **Fa
 **pgvector**) e **sempre cita as fontes** usadas. Quando a informação não está nas fontes, ele
 diz que não encontrou em vez de inventar.
 
-> **Status:** em desenvolvimento. A busca em documentos (US1) está pronta; guardrail de escopo,
-> cotação de moedas, calculadora e histórico de conversas estão no [roadmap](#roadmap).
+> **Status:** em desenvolvimento. A busca em documentos (US1) e o guardrail de escopo (US2)
+> estão prontos; cotação de moedas, calculadora e histórico de conversas estão no
+> [roadmap](#roadmap).
 
 ## Sumário
 
@@ -29,7 +30,7 @@ diz que não encontrou em vez de inventar.
 | User story | Descrição | Estado |
 |---|---|---|
 | US1 | Perguntas respondidas com base nos documentos, com fontes citadas | ✅ Pronta |
-| US2 | Guardrail de escopo: recusa perguntas fora de finanças e tentativas de *prompt injection* | 🚧 Planejada |
+| US2 | Guardrail de escopo: recusa perguntas fora de finanças e tentativas de *prompt injection* | ✅ Pronta |
 | US3 | Cotação de moedas em tempo real (AwesomeAPI) | 🚧 Planejada |
 | US4 | Calculadora financeira segura (sem `eval`) | 🚧 Planejada |
 | US5 | Histórico de conversas (`GET /v1/threads/{id}/messages`) e retenção com expurgo | 🚧 Planejada |
@@ -44,14 +45,25 @@ aplicação:
 
 ```mermaid
 flowchart LR
-    START((START)) --> agent
+    START((START)) --> guardrail
+    guardrail -- "in_scope" --> agent
+    guardrail -- "out_of_scope" --> refuse
+    guardrail -- "ambiguous" --> clarify
+    refuse --> END((END))
+    clarify --> END
     agent -- "chamou ferramenta" --> tools
     tools --> agent
     agent -- "resposta final" --> collect_sources
     collect_sources --> enforce_grounding
-    enforce_grounding --> END((END))
+    enforce_grounding --> END
 ```
 
+- **`guardrail`**: classificador (structured output, `GUARDRAIL_MODEL`) que roda antes de
+  qualquer ferramenta. Recebe a mensagem atual e as 2 últimas trocas da conversa, para que
+  acompanhamentos como "E o euro?" não sejam recusados, e trata o texto do usuário como dado,
+  nunca como instrução. Se o classificador falhar, a mensagem é tratada como fora de escopo.
+- **`refuse`** / **`clarify`**: devolvem uma mensagem fixa (recusa padrão ou pedido de
+  esclarecimento), sem chamar o LLM nem ferramentas.
 - **`agent`**: LLM (`gpt-4o-mini` por padrão) com as ferramentas vinculadas e um *system prompt*
   em pt-BR que exige respostas baseadas só no retorno das ferramentas.
 - **`tools`**: executa as ferramentas pedidas pelo agente. Hoje há uma:
@@ -199,6 +211,7 @@ Variáveis lidas do ambiente ou do `.env` (veja [`.env.example`](.env.example) e
 |---|---|---|
 | `OPENAI_API_KEY` | — | Chave da OpenAI (obrigatória) |
 | `LLM_MODEL` | `gpt-4o-mini` | Modelo do agente |
+| `GUARDRAIL_MODEL` | `gpt-4o-mini` | Modelo do classificador de escopo |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | Modelo de embeddings da busca |
 | `LLM_TIMEOUT_SECONDS` | `30` | *Timeout* das chamadas à OpenAI |
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/financial_agent` | Postgres com pgvector (checkpoints e vetores) |
@@ -206,7 +219,6 @@ Variáveis lidas do ambiente ou do `.env` (veja [`.env.example`](.env.example) e
 | `RAG_TOP_K` | `4` | Quantidade de trechos buscados por consulta |
 | `API_KEYS` | vazio | Chaves aceitas em `X-API-Key`, separadas por vírgula. Vazio desativa a autenticação |
 | `LOG_LEVEL` | `INFO` | Nível dos logs |
-| `GUARDRAIL_MODEL` | `gpt-4o-mini` | Reservada para o guardrail (US2) |
 | `FX_API_BASE_URL` | `https://economia.awesomeapi.com.br` | Reservada para a cotação de moedas (US3) |
 | `FX_TIMEOUT_SECONDS` | `5` | Reservada para a cotação de moedas (US3) |
 | `THREAD_RETENTION_DAYS` | `30` | Reservada para o expurgo de conversas (US5) |
@@ -233,7 +245,7 @@ caderneta de poupança e tributação de renda fixa.
 ```bash
 uv run pytest -m "not eval and not integration"     # unitários e de contrato (sem rede, sem banco)
 uv run pytest -m integration                        # Postgres + pgvector reais via testcontainers (requer Docker)
-uv run pytest -m eval tests/eval/test_grounding.py  # LLM real: custa tokens, usa o .env
+uv run pytest -m eval                               # LLM real: custa tokens, usa o .env
 
 uv run ruff check .
 uv run ruff format --check .
@@ -254,6 +266,16 @@ cada afirmação. As metas são:
 
 As afirmações sem sustentação são gravadas em `tests/eval/out/` para diagnóstico.
 
+**Avaliação de escopo** (`tests/eval/test_scope.py`): roda 100 mensagens, sendo 44 fora de
+escopo (12 delas tentativas de *prompt injection*), 42 financeiras (8 delas acompanhamentos com
+contexto), 6 ambíguas e 8 mistas. As metas são:
+
+- ≥ 95% das mensagens fora de escopo recusadas e ≤ 5% das financeiras recusadas por engano;
+- p95 da latência das recusas ≤ 3 s;
+- nenhuma mensagem ambígua recusada sem pedir esclarecimento;
+- 100% das mistas respondidas na parte financeira, com aviso de que o resto foi ignorado;
+- 100% das respostas em pt-BR.
+
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em cada push na `main` e em cada
 pull request roda lint e tipos, testes unitários e de contrato, testes de integração e o build da
 imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
@@ -269,8 +291,6 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 
 ## Roadmap
 
-- **US2 – Guardrail de escopo:** classificador antes do agente que recusa assuntos fora de
-  finanças e tentativas de *prompt injection*, e pede esclarecimento quando a pergunta é ambígua.
 - **US3 – Cotação de moedas:** ferramenta `get_currency_quote` usando a AwesomeAPI, com a
   cotação citada como fonte.
 - **US4 – Calculadora:** ferramenta `calculate` com avaliação segura por AST e `Decimal`, para
