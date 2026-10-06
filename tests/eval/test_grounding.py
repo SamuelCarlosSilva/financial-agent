@@ -1,0 +1,193 @@
+"""Eval de fundamentação da US1 com o LLM real (SC-002, SC-003, FR-014).
+
+Usa a configuração real (`.env`): OpenAI e o Postgres de `DATABASE_URL`, onde `data/docs/` é
+reingerido antes da execução (a ingestão é idempotente).
+
+    uv run pytest -m eval tests/eval/test_grounding.py
+"""
+
+import asyncio
+import json
+import re
+import unicodedata
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from financial_agent.api.app import create_app
+from financial_agent.config import get_settings
+from financial_agent.logging import truncate
+from financial_agent.rag.ingest import ingest_directory, load_directory, split_documents
+from financial_agent.rag.vectorstore import close_vectorstore, get_embeddings, get_vectorstore
+from financial_agent.tools.document_search import SNIPPET_MAX_CHARS
+from tests.eval.judge import Verdict, aggregate, judge
+
+pytestmark = pytest.mark.eval
+
+ROOT = Path(__file__).resolve().parents[2]
+DATASET = Path(__file__).parent / "datasets" / "grounding.jsonl"
+FAILURES = Path(__file__).parent / "out" / "grounding_failures.jsonl"
+DOCS_DIR = ROOT / "data" / "docs"
+
+NOT_FOUND_MARKERS = (
+    "nao encontrei",
+    "nao encontrou",
+    "nao localizei",
+    "nao ha informac",
+    "nao tenho informac",
+    "nao consta",
+)
+
+
+def normalize(text: str) -> str:
+    """Minúsculas, sem acentos, espaços colapsados e vírgula decimal ("22.5" → "22,5")."""
+    text = unicodedata.normalize("NFKD", text.casefold())
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r"(\d)\.(\d)", r"\1,\2", text)
+    return " ".join(text.split())
+
+
+def fact_present(fact: str | list[str], answer: str) -> bool:
+    """Um fato é uma string ou uma lista de alternativas equivalentes."""
+    alternatives = [fact] if isinstance(fact, str) else fact
+    normalized = normalize(answer)
+    return any(normalize(alt) in normalized for alt in alternatives)
+
+
+def says_not_found(answer: str) -> bool:
+    normalized = normalize(answer)
+    return any(marker in normalized for marker in NOT_FOUND_MARKERS)
+
+
+def document_sources(sources: list[dict[str, Any]]) -> list[str]:
+    return [s["source"] for s in sources if s.get("type") == "document"]
+
+
+def chunk_texts() -> dict[tuple[str, str], str]:
+    """(source, snippet) → texto completo do trecho, reconstruído a partir de `data/docs/`."""
+    texts = {}
+    for chunk in split_documents(load_directory(DOCS_DIR)):
+        snippet = truncate(" ".join(chunk.page_content.split()), SNIPPET_MAX_CHARS)
+        texts[(chunk.metadata["source"], snippet)] = chunk.page_content
+    return texts
+
+
+def with_full_text(
+    sources: list[dict[str, Any]], texts: dict[tuple[str, str], str]
+) -> list[dict[str, Any]]:
+    """O juiz precisa do trecho inteiro que o agente leu, não só do snippet de 300 caracteres."""
+    expanded = []
+    for source in sources:
+        key = (source.get("source", ""), source.get("snippet", ""))
+        if source.get("type") == "document" and key in texts:
+            source = {**source, "snippet": texts[key]}
+        expanded.append(source)
+    return expanded
+
+
+def without_not_found_claims(verdict: Verdict) -> Verdict:
+    """Garante que "não encontrei" não conte como afirmação, mesmo se o juiz a extrair."""
+    claims = [c for c in verdict.claims if not says_not_found(c.text)]
+    return verdict.model_copy(update={"claims": claims})
+
+
+def load_dataset() -> list[dict[str, Any]]:
+    lines = DATASET.read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines if line.strip()]
+
+
+async def _ingest_docs() -> None:
+    settings = get_settings()
+    vectorstore = get_vectorstore(settings, get_embeddings(settings))
+    try:
+        await ingest_directory(DOCS_DIR, vectorstore)
+    finally:
+        await close_vectorstore(vectorstore)
+
+
+@pytest.fixture(scope="module")
+def results() -> Iterator[list[dict[str, Any]]]:
+    """Roda o dataset inteiro uma vez (cada pergunta em uma thread nova) e julga as respostas."""
+    get_settings.cache_clear()
+    if not get_settings().OPENAI_API_KEY.get_secret_value():
+        pytest.skip("OPENAI_API_KEY não configurada")
+    asyncio.run(_ingest_docs())
+
+    texts = chunk_texts()
+    rows: list[dict[str, Any]] = []
+    with TestClient(create_app()) as client:
+        for case in load_dataset():
+            response = client.post("/v1/chat", json={"message": case["question"]})
+            assert response.status_code == 200, response.text
+            body = response.json()
+            verdict = judge(
+                body["answer"], with_full_text(body["sources"], texts), case["question"]
+            )
+            verdict = without_not_found_claims(verdict)
+            rows.append(
+                {**case, "answer": body["answer"], "sources": body["sources"], "verdict": verdict}
+            )
+
+    FAILURES.parent.mkdir(parents=True, exist_ok=True)
+    with FAILURES.open("w", encoding="utf-8") as out:
+        for row in rows:
+            verdict: Verdict = row["verdict"]
+            if not verdict.fully_supported:
+                record = {
+                    "question": row["question"],
+                    "answer": row["answer"],
+                    "sources": row["sources"],
+                    "unsupported_claims": [c.text for c in verdict.unsupported_claims],
+                }
+                out.write(json.dumps(record, ensure_ascii=False) + "\n")
+    yield rows
+
+
+def answerable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [r for r in rows if not r.get("expect_not_found")]
+
+
+def unanswerable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [r for r in rows if r.get("expect_not_found")]
+
+
+def test_answerable_questions_accuracy(results: list[dict[str, Any]]) -> None:
+    rows = answerable(results)
+    misses = [
+        r["question"]
+        for r in rows
+        if not (
+            all(fact_present(f, r["answer"]) for f in r["expected_facts"])
+            and r["expected_source"] in document_sources(r["sources"])
+        )
+    ]
+    accuracy = 1 - len(misses) / len(rows)
+    assert accuracy >= 0.90, f"acerto {accuracy:.0%} < 90% (SC-003); erros: {misses}"
+
+
+def test_unanswerable_questions_say_not_found(results: list[dict[str, Any]]) -> None:
+    rows = unanswerable(results)
+    misses = [r["question"] for r in rows if not says_not_found(r["answer"])]
+    rate = 1 - len(misses) / len(rows)
+    assert rate >= 0.95, f'"não encontrei" em {rate:.0%} < 95% (SC-003); erros: {misses}'
+
+
+def test_unanswerable_questions_cite_no_documents(results: list[dict[str, Any]]) -> None:
+    cited = {
+        r["question"]: document_sources(r["sources"])
+        for r in unanswerable(results)
+        if document_sources(r["sources"])
+    }
+    assert not cited, f"perguntas sem resposta com fontes de documento: {cited}"
+
+
+def test_all_claims_supported_and_in_pt_br(results: list[dict[str, Any]]) -> None:
+    summary = aggregate([r["verdict"] for r in results])
+    assert summary.supported_rate == 1.0, (
+        f"{summary.claims - summary.supported_claims} de {summary.claims} afirmações sem "
+        f"fonte (SC-002); detalhes em {FAILURES.relative_to(ROOT)}"
+    )
+    assert summary.pt_br_rate == 1.0, f"pt-BR em {summary.pt_br_rate:.0%} das respostas (FR-014)"

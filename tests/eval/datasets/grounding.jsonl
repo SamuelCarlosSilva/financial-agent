@@ -1,0 +1,48 @@
+{"question": "O que é come-cotas?", "expected_facts": [["imposto de renda", "IR"], ["semestral", "duas vezes"]], "expected_source": "come-cotas.md"}
+{"question": "Em quais meses o come-cotas é cobrado?", "expected_facts": ["maio", "novembro"], "expected_source": "come-cotas.md"}
+{"question": "Qual a alíquota do come-cotas em fundos de longo prazo?", "expected_facts": ["15%"], "expected_source": "come-cotas.md"}
+{"question": "Qual a alíquota do come-cotas em fundos de curto prazo?", "expected_facts": ["20%"], "expected_source": "come-cotas.md"}
+{"question": "Fundos de ações têm come-cotas?", "expected_facts": ["15%", "resgate"], "expected_source": "come-cotas.md"}
+{"question": "Desde quando os fundos exclusivos passaram a ter come-cotas?", "expected_facts": ["2024"], "expected_source": "come-cotas.md"}
+{"question": "Qual a alíquota de IR de um CDB resgatado com 100 dias de aplicação?", "expected_facts": ["22,5%"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "Qual a alíquota de IR da renda fixa para aplicações acima de 720 dias?", "expected_facts": ["15%"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "Qual a alíquota de IR da renda fixa para aplicações entre 361 e 720 dias?", "expected_facts": ["17,5%"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "Como funciona a tributação de fundos de renda fixa de curto prazo?", "expected_facts": ["22,5%", "20%"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "Quando o IOF é cobrado sobre investimentos de renda fixa?", "expected_facts": ["30 dias"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "Qual é o IOF sobre o rendimento no primeiro dia de aplicação?", "expected_facts": ["96%"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "A LCI paga imposto de renda para pessoa física?", "expected_facts": ["isen"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "Quais investimentos de renda fixa são isentos de IR para pessoa física?", "expected_facts": ["poupança", "LCI", "LCA"], "expected_source": "tributacao-renda-fixa.md"}
+{"question": "Qual o limite de garantia do FGC por CPF?", "expected_facts": [["250 mil", "250.000", "250000"]], "expected_source": "fgc.md"}
+{"question": "Qual é o teto global de garantia do FGC?", "expected_facts": [["1 milhão", "1.000.000", "1 mi"], ["4 anos", "quatro anos"]], "expected_source": "fgc.md"}
+{"question": "O Tesouro Direto é coberto pelo FGC?", "expected_facts": ["Tesouro Nacional"], "expected_source": "fgc.md"}
+{"question": "Quais investimentos são cobertos pelo FGC?", "expected_facts": ["CDB", "poupança"], "expected_source": "fgc.md"}
+{"question": "Como rende a poupança quando a Selic está acima de 8,5% ao ano?", "expected_facts": ["0,5%", ["TR", "taxa referencial"]], "expected_source": "poupanca.md"}
+{"question": "Quanto rende a poupança quando a Selic está em 8,5% ao ano ou menos?", "expected_facts": ["70%"], "expected_source": "poupanca.md"}
+{"question": "O que acontece se eu resgatar a poupança antes da data de aniversário?", "expected_facts": [["perde", "perder", "não recebe"]], "expected_source": "poupanca.md"}
+{"question": "Quem define a meta da taxa Selic?", "expected_facts": [["Copom", "Comitê de Política Monetária"]], "expected_source": "glossario-renda-fixa.md"}
+{"question": "O que é o CDI?", "expected_facts": [["interbancário", "entre si", "entre bancos"]], "expected_source": "glossario-renda-fixa.md"}
+{"question": "Quem calcula o IPCA?", "expected_facts": ["IBGE"], "expected_source": "glossario-renda-fixa.md"}
+{"question": "Qual a taxa de custódia cobrada no Tesouro Direto?", "expected_facts": [["0,20%", "0,2%"]], "expected_source": "glossario-renda-fixa.md"}
+{"question": "O que é marcação a mercado?", "expected_facts": [["diári", "diariamente", "todo dia"]], "expected_source": "glossario-renda-fixa.md"}
+{"question": "Qual é a taxa de administração média dos fundos multimercado?", "expect_not_found": true}
+{"question": "Como funciona a tributação de criptomoedas no Brasil?", "expect_not_found": true}
+{"question": "O que é uma opção de compra (call) no mercado de opções?", "expect_not_found": true}
+{"question": "Qual a diferença entre PGBL e VGBL na previdência privada?", "expect_not_found": true}
+{"question": "Qual o limite de vendas de ações por mês para ter isenção de IR?", "expect_not_found": true}
+{"question": "O que é o índice de Sharpe?", "expect_not_found": true}
+{"question": "Como funciona um consórcio de imóveis?", "expect_not_found": true}
+{"question": "Como funciona a tributação de day trade?", "expect_not_found": true}
+{"question": "O que é o IGP-M e quem calcula?", "expect_not_found": true}
+{"question": "O que são BDRs?", "expect_not_found": true}
+{"question": "Quais são os juros do rotativo do cartão de crédito?", "expect_not_found": true}
+{"question": "Como funciona a amortização pela tabela SAC no financiamento imobiliário?", "expect_not_found": true}
+{"question": "Qual o prazo de liquidação de uma compra de ações na B3?", "expect_not_found": true}
+{"question": "O que é hedge cambial?", "expect_not_found": true}
+{"question": "O que são dividendos e juros sobre capital próprio?", "expect_not_found": true}
+{"question": "Como funciona o empréstimo com garantia de imóvel?", "expect_not_found": true}
+{"question": "Qual é o valor mínimo para começar a investir em ações?", "expect_not_found": true}
+{"question": "Como funciona o crédito consignado para aposentados?", "expect_not_found": true}
+{"question": "O que é um fundo de previdência com tabela progressiva?", "expect_not_found": true}
+{"question": "Como funciona a portabilidade de crédito entre bancos?", "expect_not_found": true}
+{"question": "Como funciona a declaração de ações no Imposto de Renda?", "expect_not_found": true}
+{"question": "O que é o spread bancário?", "expect_not_found": true}

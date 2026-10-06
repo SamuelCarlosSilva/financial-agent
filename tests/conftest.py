@@ -15,8 +15,16 @@ DEFAULT_ANSWER = "Resposta de teste do assistente financeiro."
 
 
 @pytest.fixture(autouse=True)
-def test_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Isola os testes do `.env` local: sem chave real e sem autenticação."""
+def test_settings(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """Isola os testes do `.env` local: sem chave real e sem autenticação.
+
+    Os evals (`-m eval`) usam a configuração real e ficam de fora.
+    """
+    if request.node.get_closest_marker("eval"):
+        yield
+        return
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("API_KEYS", "")
     monkeypatch.setenv("LOG_LEVEL", "WARNING")

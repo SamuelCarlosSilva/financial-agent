@@ -17,7 +17,10 @@ fontes numeradas que o assistente usou.
 1. Extraia cada afirmação factual da resposta (números, taxas, regras, cotações, datas). \
 Para cada uma, marque `supported=true` somente se ela estiver sustentada por alguma fonte e \
 informe `source_index` (base 0); caso contrário, `supported=false` e `source_index=null`. \
-Frases como "não encontrei essa informação" não são afirmações factuais.
+Não são afirmações factuais: dizer que não encontrou a informação ou que ela está \
+indisponível, sugestões ao usuário (ex.: "consulte sua corretora"), ofertas de ajuda e a \
+própria lista de fontes e o aviso de que a resposta não constitui recomendação de \
+investimento. Não as inclua em `claims`.
 2. `language`: idioma da resposta no formato ISO 639-1 com região (ex.: "pt-BR", "pt-PT", "en-US").
 3. `has_partial_notice`: a resposta avisa que parte da pergunta foi ignorada por estar fora \
 do escopo financeiro?
@@ -86,7 +89,10 @@ def format_sources(sources: Sequence[dict[str, Any]]) -> str:
 def default_judge_llm() -> BaseChatModel:
     from langchain_openai import ChatOpenAI
 
-    return ChatOpenAI(model=JUDGE_MODEL, temperature=0)
+    from financial_agent.config import get_settings
+
+    # A chave vem do Settings (que lê o `.env`), como no app; o SDK só olharia o ambiente.
+    return ChatOpenAI(model=JUDGE_MODEL, temperature=0, api_key=get_settings().OPENAI_API_KEY)
 
 
 def judge(

@@ -71,8 +71,21 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.run_eval
     needs: test
     runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: financial_agent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d financial_agent"
+          --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/financial_agent
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -80,5 +93,10 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv sync --frozen
-      # Código de saída 5 = nenhum teste coletado (ainda não há testes de eval).
-      - run: uv run pytest -m eval || [ $? -eq 5 ]
+      - run: uv run pytest -m eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-failures
+          path: tests/eval/out/
+          if-no-files-found: ignore
