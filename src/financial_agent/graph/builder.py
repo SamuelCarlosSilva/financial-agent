@@ -1,4 +1,9 @@
-"""Montagem do grafo: START → agent ⇄ tools → collect_sources → enforce_grounding → END."""
+"""Montagem do grafo.
+
+START → guardrail ─┬─ in_scope     → agent ⇄ tools → collect_sources → enforce_grounding → END
+                   ├─ out_of_scope → refuse → END
+                   └─ ambiguous    → clarify → END
+"""
 
 from collections.abc import Sequence
 from typing import Any
@@ -11,7 +16,10 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from financial_agent.graph.nodes.agent import collect_sources, make_agent_node
+from financial_agent.graph.nodes.clarify import clarify
 from financial_agent.graph.nodes.grounding import enforce_grounding
+from financial_agent.graph.nodes.guardrail import GuardrailNode, route_after_guardrail
+from financial_agent.graph.nodes.refuse import refuse
 from financial_agent.graph.state import GraphState
 
 # Usado no config de cada invocação (agent ⇄ tools não pode girar indefinidamente).
@@ -22,11 +30,12 @@ def build_graph(
     checkpointer: BaseCheckpointSaver[Any],
     llm: BaseChatModel,
     tools: Sequence[BaseTool],
-    guardrail: Any | None = None,
+    guardrail: GuardrailNode | None = None,
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
     """Compila o grafo do agente.
 
-    `guardrail` é o gancho que a US2 conecta como primeiro nó; até lá, é ignorado.
+    Com `guardrail`, toda mensagem é classificada antes de chegar ao agente. Sem ele (testes do
+    laço do agente), o grafo começa direto no `agent`.
     """
     builder = StateGraph(GraphState)
     builder.add_node("agent", make_agent_node(llm, tools))
@@ -34,7 +43,21 @@ def build_graph(
     builder.add_node("collect_sources", collect_sources)
     builder.add_node("enforce_grounding", enforce_grounding)
 
-    builder.add_edge(START, "agent")
+    if guardrail is None:
+        builder.add_edge(START, "agent")
+    else:
+        builder.add_node("guardrail", guardrail)
+        builder.add_node("refuse", refuse)
+        builder.add_node("clarify", clarify)
+        builder.add_edge(START, "guardrail")
+        builder.add_conditional_edges(
+            "guardrail",
+            route_after_guardrail,
+            {"agent": "agent", "refuse": "refuse", "clarify": "clarify"},
+        )
+        builder.add_edge("refuse", END)
+        builder.add_edge("clarify", END)
+
     builder.add_conditional_edges(
         "agent", tools_condition, {"tools": "tools", END: "collect_sources"}
     )
