@@ -12,6 +12,7 @@ from langgraph.graph.state import CompiledStateGraph
 from financial_agent.api import db
 from financial_agent.api.errors import register_error_handlers
 from financial_agent.api.routes import router
+from financial_agent.api.threads import InMemoryThreadStore, PostgresThreadStore, ThreadStore
 from financial_agent.config import get_settings
 from financial_agent.graph.builder import build_graph
 from financial_agent.graph.nodes.guardrail import make_guardrail_node
@@ -34,6 +35,8 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
     vectorstore = get_vectorstore(settings, get_embeddings(settings))
     try:
         checkpointer = await db.setup_checkpointer(pool)
+        await db.setup_thread_metadata(pool)
+        app.state.threads = PostgresThreadStore(pool)
         llm = ChatOpenAI(
             model=settings.LLM_MODEL,
             temperature=0,
@@ -65,11 +68,13 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(
     graph: CompiledStateGraph[Any, Any, Any, Any] | None = None,
     ping: PingFn | None = None,
+    threads: ThreadStore | None = None,
 ) -> FastAPI:
     """Cria a aplicação.
 
-    Com `graph` (modo de teste), o lifespan não abre pool nem checkpointer e o `/health` usa
-    o `ping` injetado (por padrão, sempre "ok").
+    Com `graph` (modo de teste), o lifespan não abre pool nem checkpointer, o `/health` usa
+    o `ping` injetado (por padrão, sempre "ok") e as threads ficam no registro injetado (por
+    padrão, em memória).
     """
     if graph is None:
         lifespan = _production_lifespan
@@ -79,6 +84,7 @@ def create_app(
         async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             app.state.graph = graph
             app.state.ping = ping or _always_ok
+            app.state.threads = threads or InMemoryThreadStore()
             yield
 
     app = FastAPI(title="Financial Agent API", version="1.0.0", lifespan=lifespan)

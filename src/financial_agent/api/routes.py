@@ -3,21 +3,32 @@
 import time
 from collections.abc import Sequence
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from pydantic import TypeAdapter
 
-from financial_agent.api.schemas import ChatRequest, ChatResponse, Health, ScopeLabel
+from financial_agent.api.errors import NotFoundError
+from financial_agent.api.schemas import (
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    Health,
+    ScopeLabel,
+    ThreadHistory,
+)
 from financial_agent.api.security import require_api_key
 from financial_agent.graph.builder import RECURSION_LIMIT
-from financial_agent.graph.state import SourceCitation
+from financial_agent.graph.state import SourceCitation, utc_now_iso
 from financial_agent.logging import get_logger, request_id_var
 
 log = get_logger(__name__)
 
 router = APIRouter()
+
+_sources_adapter: TypeAdapter[list[SourceCitation]] = TypeAdapter(list[SourceCitation])
 
 
 @router.get("/health", response_model=Health, responses={503: {"model": Health}})
@@ -51,8 +62,10 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     thread_id = body.thread_id or uuid4()
     started = time.perf_counter()
 
+    await request.app.state.threads.touch(str(thread_id))
+    message = HumanMessage(body.message, additional_kwargs={"created_at": utc_now_iso()})
     state: dict[str, Any] = await graph.ainvoke(
-        {"messages": [HumanMessage(body.message)], "turn_sources": []},
+        {"messages": [message], "turn_sources": []},
         config={"configurable": {"thread_id": str(thread_id)}, "recursion_limit": RECURSION_LIMIT},
     )
 
@@ -77,3 +90,34 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     )
 
     return ChatResponse(thread_id=thread_id, answer=answer, scope=scope, sources=sources)
+
+
+def _to_chat_message(message: BaseMessage) -> ChatMessage | None:
+    """Só a conversa visível: pergunta do usuário e resposta final do assistente."""
+    created_at = message.additional_kwargs.get("created_at")
+    if isinstance(message, HumanMessage):
+        return ChatMessage(role="user", content=message.text, created_at=created_at)
+    if isinstance(message, AIMessage) and message.text and not message.tool_calls:
+        sources = _sources_adapter.validate_python(message.additional_kwargs.get("sources", []))
+        return ChatMessage(
+            role="assistant", content=message.text, created_at=created_at, sources=sources
+        )
+    return None
+
+
+@router.get(
+    "/v1/threads/{thread_id}/messages",
+    response_model=ThreadHistory,
+    response_model_exclude_none=True,
+    dependencies=[Depends(require_api_key)],
+)
+async def thread_messages(thread_id: UUID, request: Request) -> ThreadHistory:
+    if not await request.app.state.threads.exists(str(thread_id)):
+        raise NotFoundError("Thread não encontrada.")
+
+    snapshot = await request.app.state.graph.aget_state(
+        {"configurable": {"thread_id": str(thread_id)}}
+    )
+    messages = snapshot.values.get("messages", [])
+    history = [m for m in (_to_chat_message(message) for message in messages) if m is not None]
+    return ThreadHistory(thread_id=thread_id, messages=history)
