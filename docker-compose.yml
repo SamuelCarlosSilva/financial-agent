@@ -29,5 +29,20 @@ services:
       db:
         condition: service_healthy
 
+  # Expurgo das threads inativas (retenção). Agendar diariamente, por exemplo:
+  # 0 3 * * * docker compose --profile maintenance run --rm purge
+  purge:
+    build: .
+    profiles: [maintenance]
+    command: ["python", "-m", "financial_agent.maintenance.purge_threads"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/financial_agent
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
