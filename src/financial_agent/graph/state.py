@@ -1,8 +1,9 @@
 """Estado do grafo e modelos de fontes citadas (data-model.md §3–§5)."""
 
-from datetime import datetime
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from langgraph.graph import MessagesState
 from pydantic import BaseModel, Field
@@ -49,3 +50,12 @@ class GraphState(MessagesState):
     scope: ScopeDecision | None
     # Fontes do turno atual; a rota envia [] a cada turno para zerar o valor anterior.
     turn_sources: list[SourceCitation]
+
+
+def utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def history_metadata(sources: Sequence[SourceCitation] = ()) -> dict[str, Any]:
+    """`additional_kwargs` da resposta do assistente, lidos pelo histórico da thread (FR-016)."""
+    return {"sources": [s.model_dump(mode="json") for s in sources], "created_at": utc_now_iso()}
