@@ -7,8 +7,8 @@ Assistente financeiro conversacional exposto como API REST. Construído com **Fa
 **pgvector**) e **sempre cita as fontes** usadas. Quando a informação não está nas fontes, ele
 diz que não encontrou em vez de inventar.
 
-> **Status:** em desenvolvimento. A busca em documentos (US1) e o guardrail de escopo (US2)
-> estão prontos; cotação de moedas, calculadora e histórico de conversas estão no
+> **Status:** em desenvolvimento. A busca em documentos (US1), o guardrail de escopo (US2) e o
+> histórico de conversas (US5) estão prontos; cotação de moedas e calculadora estão no
 > [roadmap](#roadmap).
 
 ## Sumário
@@ -19,6 +19,7 @@ diz que não encontrou em vez de inventar.
 - [Como rodar](#como-rodar)
 - [Uso da API](#uso-da-api)
 - [Configuração](#configuração)
+- [Retenção das conversas](#retenção-das-conversas)
 - [Base de conhecimento](#base-de-conhecimento)
 - [Testes e qualidade](#testes-e-qualidade)
 - [Segurança](#segurança)
@@ -33,7 +34,7 @@ diz que não encontrou em vez de inventar.
 | US2 | Guardrail de escopo: recusa perguntas fora de finanças e tentativas de *prompt injection* | ✅ Pronta |
 | US3 | Cotação de moedas em tempo real (AwesomeAPI) | 🚧 Planejada |
 | US4 | Calculadora financeira segura (sem `eval`) | 🚧 Planejada |
-| US5 | Histórico de conversas (`GET /v1/threads/{id}/messages`) e retenção com expurgo | 🚧 Planejada |
+| US5 | Histórico de conversas (`GET /v1/threads/{id}/messages`) e retenção com expurgo | ✅ Pronta |
 
 Especificação completa em [`specs/001-financial-assistant-api/spec.md`](specs/001-financial-assistant-api/spec.md)
 e o andamento tarefa a tarefa em [`tasks.md`](specs/001-financial-assistant-api/tasks.md).
@@ -97,7 +98,7 @@ src/financial_agent/
 ├── graph/         # LangGraph: estado, prompts, nós (agent, grounding) e builder
 ├── rag/           # vector store (pgvector) e CLI de ingestão
 ├── tools/         # ferramentas do agente (busca em documentos)
-├── maintenance/   # reservado para o expurgo de conversas (US5)
+├── maintenance/   # expurgo das conversas inativas
 ├── config.py      # configuração tipada via variáveis de ambiente
 └── logging.py     # logs estruturados em JSON
 tests/
@@ -189,6 +190,25 @@ curl -s localhost:8000/v1/chat \
   -d '{"message":"E em quais meses ele é cobrado?","thread_id":"6f1c2a9e-3b7d-4c1e-9a52-0d8e4f7b1a23"}'
 ```
 
+### Histórico
+
+```bash
+curl -s localhost:8000/v1/threads/6f1c2a9e-3b7d-4c1e-9a52-0d8e4f7b1a23/messages
+```
+
+```json
+{
+  "thread_id": "6f1c2a9e-3b7d-4c1e-9a52-0d8e4f7b1a23",
+  "messages": [
+    {"role": "user", "content": "O que é come-cotas?", "created_at": "2026-10-06T12:00:00.120000+00:00"},
+    {"role": "assistant", "content": "O come-cotas é ... [1]", "created_at": "2026-10-06T12:00:03.480000+00:00", "sources": [{"type": "document", "...": "..."}]}
+  ]
+}
+```
+
+Só aparecem as mensagens do usuário e as respostas finais do assistente, em ordem cronológica;
+chamadas de ferramenta e mensagens internas ficam de fora.
+
 Com `API_KEYS` definido, inclua o cabeçalho `X-API-Key: <chave>` (o `/health` é isento).
 
 **Erros** seguem o formato `{"error": {"code", "message", "request_id"}}`:
@@ -196,6 +216,7 @@ Com `API_KEYS` definido, inclua o cabeçalho `X-API-Key: <chave>` (o `/health` �
 | Status | `code` | Quando |
 |---|---|---|
 | 401 | `unauthorized` | `X-API-Key` ausente ou inválida |
+| 404 | `not_found` | histórico de uma thread que não existe |
 | 422 | `validation_error` | `message` vazia ou com mais de 4000 caracteres, `thread_id` que não é UUID, campos extras |
 | 503 | `upstream_unavailable` | falha ou *timeout* da OpenAI ou do banco |
 
@@ -214,14 +235,30 @@ Variáveis lidas do ambiente ou do `.env` (veja [`.env.example`](.env.example) e
 | `GUARDRAIL_MODEL` | `gpt-4o-mini` | Modelo do classificador de escopo |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | Modelo de embeddings da busca |
 | `LLM_TIMEOUT_SECONDS` | `30` | *Timeout* das chamadas à OpenAI |
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/financial_agent` | Postgres com pgvector (checkpoints e vetores) |
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/financial_agent` | Postgres com pgvector (checkpoints, metadata das threads e vetores) |
 | `RAG_MIN_SCORE` | `0.35` | Relevância mínima (0–1) para um trecho ser usado |
 | `RAG_TOP_K` | `4` | Quantidade de trechos buscados por consulta |
 | `API_KEYS` | vazio | Chaves aceitas em `X-API-Key`, separadas por vírgula. Vazio desativa a autenticação |
 | `LOG_LEVEL` | `INFO` | Nível dos logs |
 | `FX_API_BASE_URL` | `https://economia.awesomeapi.com.br` | Reservada para a cotação de moedas (US3) |
 | `FX_TIMEOUT_SECONDS` | `5` | Reservada para a cotação de moedas (US3) |
-| `THREAD_RETENTION_DAYS` | `30` | Reservada para o expurgo de conversas (US5) |
+| `THREAD_RETENTION_DAYS` | `30` | Dias sem atividade até uma conversa ser expurgada |
+
+## Retenção das conversas
+
+A cada mensagem, a tabela `thread_metadata` registra a última atividade da thread. O expurgo remove
+checkpoints e metadata das conversas sem atividade há mais de `THREAD_RETENTION_DAYS` dias:
+
+```bash
+docker compose --profile maintenance run --rm purge          # em Docker
+uv run python -m financial_agent.maintenance.purge_threads  # local
+```
+
+Agende diariamente, por exemplo no cron do host:
+
+```cron
+0 3 * * * cd /caminho/do/projeto && docker compose --profile maintenance run --rm purge
+```
 
 ## Base de conhecimento
 
@@ -284,7 +321,8 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 ## Segurança
 
 - **Ative `API_KEYS` em qualquer ambiente que não seja local.** Sem chaves, a API fica aberta.
-- O `thread_id` é um identificador, não uma credencial: quem o conhece pode continuar a conversa.
+- O `thread_id` é um identificador, não uma credencial: quem o conhece pode continuar a conversa
+  e ler todo o histórico em `GET /v1/threads/{id}/messages`.
 - O `.env` nunca deve ser versionado; use o `.env.example` como modelo.
 - Os logs são JSON estruturado, com `request_id` por requisição; o conteúdo das mensagens é
   truncado e as chaves nunca são registradas.
@@ -295,8 +333,6 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
   cotação citada como fonte.
 - **US4 – Calculadora:** ferramenta `calculate` com avaliação segura por AST e `Decimal`, para
   que nenhum número venha "de cabeça" do LLM.
-- **US5 – Histórico e retenção:** `GET /v1/threads/{id}/messages` e expurgo diário das conversas
-  inativas há mais de `THREAD_RETENTION_DAYS` dias.
 - **Polimento:** relatório consolidado das avaliações, testes de latência e carga, avaliação de
   aviso de "não é recomendação de investimento".
 

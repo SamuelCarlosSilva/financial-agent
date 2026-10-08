@@ -16,7 +16,7 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel, TypeAdapter
 
 from financial_agent.graph.prompts import AGENT_SYSTEM_PROMPT
-from financial_agent.graph.state import GraphState, SourceCitation
+from financial_agent.graph.state import GraphState, SourceCitation, history_metadata
 
 _source_adapter: TypeAdapter[SourceCitation] = TypeAdapter(SourceCitation)
 
@@ -68,7 +68,8 @@ def collect_sources(state: GraphState) -> dict[str, Any]:
     """Junta em `turn_sources` os artefatos dos `ToolMessage`s do turno atual.
 
     Trechos de documento só entram se a resposta final citar o número deles: a busca pode
-    trazer trechos parecidos que não respondem à pergunta, e esses não são fontes.
+    trazer trechos parecidos que não respondem à pergunta, e esses não são fontes. As fontes e o
+    horário também vão para a resposta final, que é o que o histórico da thread expõe.
     """
     turn = current_turn(state["messages"])
     final = next((m for m in reversed(turn) if isinstance(m, AIMessage)), None)
@@ -84,4 +85,10 @@ def collect_sources(state: GraphState) -> dict[str, Any]:
             if source.type == "document" and (first is None or first + offset not in cited):
                 continue
             sources.append(source)
-    return {"turn_sources": sources}
+
+    update: dict[str, Any] = {"turn_sources": sources}
+    if final is not None:
+        # Mesmo id: o reducer `add_messages` substitui a resposta em vez de acrescentar outra.
+        kwargs = {**final.additional_kwargs, **history_metadata(sources)}
+        update["messages"] = [final.model_copy(update={"additional_kwargs": kwargs})]
+    return update

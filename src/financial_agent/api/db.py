@@ -1,5 +1,6 @@
-"""Bootstrap do Postgres: pool de conexões, checkpointer do LangGraph e ping."""
+"""Bootstrap do Postgres: pool de conexões, checkpointer do LangGraph, metadata e ping."""
 
+from importlib.resources import files
 from typing import Any
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -29,6 +30,13 @@ async def setup_checkpointer(pool: Pool) -> AsyncPostgresSaver:
     checkpointer = AsyncPostgresSaver(pool)
     await checkpointer.setup()
     return checkpointer
+
+
+async def setup_thread_metadata(pool: Pool) -> None:
+    sql = files("financial_agent.api").joinpath("sql/thread_metadata.sql").read_text("utf-8")
+    async with pool.connection() as conn:
+        # Vários comandos no mesmo script: não pode virar prepared statement.
+        await conn.execute(sql, prepare=False)
 
 
 async def ping(pool: Pool) -> bool:

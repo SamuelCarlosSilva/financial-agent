@@ -33,4 +33,8 @@ def enforce_grounding(state: GraphState) -> dict[str, Any]:
 
     log.warning("ungrounded_answer_replaced", answer=truncate(final.text))
     # Mesmo id: o reducer `add_messages` substitui a resposta em vez de acrescentar outra.
-    return {"messages": [AIMessage(content=NOT_FOUND_MESSAGE, id=final.id)]}
+    # Os `additional_kwargs` (fontes e horário do histórico) vêm de `collect_sources`.
+    replacement = AIMessage(
+        content=NOT_FOUND_MESSAGE, id=final.id, additional_kwargs=final.additional_kwargs
+    )
+    return {"messages": [replacement]}
