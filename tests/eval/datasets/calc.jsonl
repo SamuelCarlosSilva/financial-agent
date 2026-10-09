@@ -1,0 +1,22 @@
+{"question": "Quanto rendem R$ 10.000 a juros compostos de 1% ao mês durante 12 meses? Qual o montante final?", "expected_result": "11268.25"}
+{"question": "Qual o montante de R$ 5.000 aplicados a juros compostos de 0,8% ao mês por 24 meses?", "expected_result": "6053.73"}
+{"question": "Se eu investir R$ 20.000 a 12% ao ano com juros compostos, quanto terei após 5 anos?", "expected_result": "35246.83"}
+{"question": "Quanto vale R$ 1.500 aplicados a juros compostos de 0,5% ao mês por 36 meses?", "expected_result": "1795.02"}
+{"question": "Calcule os juros simples de R$ 8.000 a 2% ao mês durante 6 meses.", "expected_result": "960.00"}
+{"question": "Qual o montante de R$ 3.000 a juros simples de 1,5% ao mês por 10 meses?", "expected_result": "3450.00"}
+{"question": "Quanto é 15% de R$ 2.340?", "expected_result": "351.00"}
+{"question": "Quanto é 7,5% de R$ 18.900?", "expected_result": "1417.50"}
+{"question": "Um produto de R$ 1.299,90 teve desconto de 12%. Qual o preço final?", "expected_result": "1143.91"}
+{"question": "Meu salário de R$ 4.250 teve reajuste de 6,5%. Qual o novo salário?", "expected_result": "4526.25"}
+{"question": "Uma ação passou de R$ 32,40 para R$ 37,26. Qual foi a variação percentual?", "expected_result": "15.00"}
+{"question": "Divida uma compra de R$ 2.400 em 12 parcelas iguais sem juros. Qual o valor de cada parcela?", "expected_result": "200.00"}
+{"question": "Um financiamento de R$ 10.000 em 12 parcelas pela Tabela Price com juros de 2% ao mês: qual o valor da parcela?", "expected_result": "945.60"}
+{"question": "Qual a parcela de um empréstimo de R$ 50.000 em 48 meses pela Tabela Price a 1,2% ao mês?", "expected_result": "1376.38"}
+{"question": "Comprei um celular em 10 parcelas de R$ 189,90. Quanto paguei no total?", "expected_result": "1899.00"}
+{"question": "Uma taxa de 1% ao mês equivale a quanto ao ano, em juros compostos? Responda em percentual.", "expected_result": "12.68"}
+{"question": "Quanto preciso aplicar hoje, a 0,9% ao mês com juros compostos, para ter R$ 30.000 daqui a 24 meses?", "expected_result": "24195.43"}
+{"question": "Considerando o dólar a R$ 5,40 (compra), quanto são US$ 250 em reais?", "expected_result": "1350.00"}
+{"question": "Com o euro cotado a R$ 6,12, quanto custam 1.800 euros em reais?", "expected_result": "11016.00"}
+{"question": "Tenho R$ 1.000 e o dólar está a R$ 5,25. Quantos dólares consigo comprar?", "expected_result": "190.48"}
+{"question": "Um CDB rende 110% do CDI, com o CDI a 10,65% ao ano. Qual a taxa anual do CDB, em percentual?", "expected_result": "11.72"}
+{"question": "Um rendimento bruto de R$ 1.840 sofre 15% de imposto de renda. Qual o rendimento líquido?", "expected_result": "1564.00"}
