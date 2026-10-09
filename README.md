@@ -7,8 +7,8 @@ Assistente financeiro conversacional exposto como API REST. Construído com **Fa
 **pgvector**) e **sempre cita as fontes** usadas. Quando a informação não está nas fontes, ele
 diz que não encontrou em vez de inventar.
 
-> **Status:** em desenvolvimento. A busca em documentos (US1), o guardrail de escopo (US2) e o
-> histórico de conversas (US5) estão prontos; cotação de moedas e calculadora estão no
+> **Status:** em desenvolvimento. A busca em documentos (US1), o guardrail de escopo (US2), a
+> cotação de moedas (US3) e o histórico de conversas (US5) estão prontos; a calculadora está no
 > [roadmap](#roadmap).
 
 ## Sumário
@@ -32,7 +32,7 @@ diz que não encontrou em vez de inventar.
 |---|---|---|
 | US1 | Perguntas respondidas com base nos documentos, com fontes citadas | ✅ Pronta |
 | US2 | Guardrail de escopo: recusa perguntas fora de finanças e tentativas de *prompt injection* | ✅ Pronta |
-| US3 | Cotação de moedas em tempo real (AwesomeAPI) | 🚧 Planejada |
+| US3 | Cotação de moedas em tempo real (AwesomeAPI) | ✅ Pronta |
 | US4 | Calculadora financeira segura (sem `eval`) | 🚧 Planejada |
 | US5 | Histórico de conversas (`GET /v1/threads/{id}/messages`) e retenção com expurgo | ✅ Pronta |
 
@@ -67,11 +67,15 @@ flowchart LR
   esclarecimento), sem chamar o LLM nem ferramentas.
 - **`agent`**: LLM (`gpt-4o-mini` por padrão) com as ferramentas vinculadas e um *system prompt*
   em pt-BR que exige respostas baseadas só no retorno das ferramentas.
-- **`tools`**: executa as ferramentas pedidas pelo agente. Hoje há uma:
-  `search_financial_documents`, que faz busca por similaridade no pgvector e descarta trechos
-  abaixo de `RAG_MIN_SCORE`.
-- **`collect_sources`**: extrai as citações (`DocumentSource`) dos resultados das ferramentas do
-  turno atual.
+- **`tools`**: executa as ferramentas pedidas pelo agente:
+  - `search_financial_documents`: busca por similaridade no pgvector, descartando trechos abaixo
+    de `RAG_MIN_SCORE`;
+  - `get_currency_quote`: cotação em tempo real na AwesomeAPI (compra, venda e data/hora no
+    horário de Brasília), com uma nova tentativa em *timeout* ou erro 5xx. Se o par não existir
+    ou o provedor estiver fora, devolve uma mensagem de erro sem nenhum valor, para o agente
+    não estimar a cotação.
+- **`collect_sources`**: extrai as citações (`DocumentSource`, `FxQuoteSource`) dos resultados
+  das ferramentas do turno atual.
 - **`enforce_grounding`**: trava de fundamentação. Se o agente buscou documentos e terminou sem
   nenhuma fonte citada, a resposta é substituída por
   *"Não encontrei essa informação nas fontes disponíveis."*
@@ -97,7 +101,7 @@ src/financial_agent/
 ├── api/           # FastAPI: app, rotas, schemas, erros, autenticação, banco
 ├── graph/         # LangGraph: estado, prompts, nós (agent, grounding) e builder
 ├── rag/           # vector store (pgvector) e CLI de ingestão
-├── tools/         # ferramentas do agente (busca em documentos)
+├── tools/         # ferramentas do agente (busca em documentos, cotação de moedas)
 ├── maintenance/   # expurgo das conversas inativas
 ├── config.py      # configuração tipada via variáveis de ambiente
 └── logging.py     # logs estruturados em JSON
@@ -240,8 +244,8 @@ Variáveis lidas do ambiente ou do `.env` (veja [`.env.example`](.env.example) e
 | `RAG_TOP_K` | `4` | Quantidade de trechos buscados por consulta |
 | `API_KEYS` | vazio | Chaves aceitas em `X-API-Key`, separadas por vírgula. Vazio desativa a autenticação |
 | `LOG_LEVEL` | `INFO` | Nível dos logs |
-| `FX_API_BASE_URL` | `https://economia.awesomeapi.com.br` | Reservada para a cotação de moedas (US3) |
-| `FX_TIMEOUT_SECONDS` | `5` | Reservada para a cotação de moedas (US3) |
+| `FX_API_BASE_URL` | `https://economia.awesomeapi.com.br` | Provedor das cotações de moedas |
+| `FX_TIMEOUT_SECONDS` | `5` | *Timeout* de cada chamada ao provedor de cotações |
 | `THREAD_RETENTION_DAYS` | `30` | Dias sem atividade até uma conversa ser expurgada |
 
 ## Retenção das conversas
@@ -329,8 +333,6 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 
 ## Roadmap
 
-- **US3 – Cotação de moedas:** ferramenta `get_currency_quote` usando a AwesomeAPI, com a
-  cotação citada como fonte.
 - **US4 – Calculadora:** ferramenta `calculate` com avaliação segura por AST e `Decimal`, para
   que nenhum número venha "de cabeça" do LLM.
 - **Polimento:** relatório consolidado das avaliações, testes de latência e carga, avaliação de
