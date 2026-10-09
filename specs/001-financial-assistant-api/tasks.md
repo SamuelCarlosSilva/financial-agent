@@ -188,14 +188,14 @@ instante. Pedir uma moeda inexistente (erro amigável) e simular o provedor fora
 
 ### Tests for User Story 4
 
-- [ ] T055 [P] [US4] Unit test in `tests/unit/test_calculator.py`: (a) `10000 * (1 + 0.01) ** 12` returns `11268.25`; (b) `2340 * 0.15` returns `351.00`; (c) `0.1 + 0.2` returns `0.30` (Decimal, no float error); (d) `1/0` returns `DIVISAO_POR_ZERO`; (e) `__import__('os')`, `abs(1)`, names, attributes, lambdas and strings return `EXPRESSAO_INVALIDA`; (f) > 200 characters returns `EXPRESSAO_INVALIDA`; (g) an exponent > 1000 returns `VALOR_MUITO_GRANDE`; (h) the artifact `CalculationSource` has the expression and result, and on error the artifact is `None`
+- [X] T055 [P] [US4] Unit test in `tests/unit/test_calculator.py`: (a) `10000 * (1 + 0.01) ** 12` returns `11268.25`; (b) `2340 * 0.15` returns `351.00`; (c) `0.1 + 0.2` returns `0.30` (Decimal, no float error); (d) `1/0` returns `DIVISAO_POR_ZERO`; (e) `__import__('os')`, `abs(1)`, names, attributes, lambdas and strings return `EXPRESSAO_INVALIDA`; (f) > 200 characters returns `EXPRESSAO_INVALIDA`; (g) an exponent > 1000 returns `VALOR_MUITO_GRANDE`; (h) the artifact `CalculationSource` has the expression and result, and on error the artifact is `None`
 
 ### Implementation for User Story 4
 
-- [ ] T056 [US4] Implement the factory `make_calculator_tool()` returning `calculate(expression: str)` in `src/financial_agent/tools/calculator.py` with `@tool(response_format="content_and_artifact")` and the docstring EXACTLY as in `contracts/tools.md`. Evaluate via `ast.parse(expr, mode="eval")` with a whitelist of nodes (`Expression`, `BinOp`, `UnaryOp`, `Constant` numeric only, operators `Add, Sub, Mult, Div, Pow, Mod, USub, UAdd`), using `Decimal` with `localcontext(prec=28)`. Limits: 200 characters, exponent ≤ 1000. Round to 2 places with `ROUND_HALF_EVEN` in the content (`"<expr> = <result>"`). `eval`/`exec` are FORBIDDEN
-- [ ] T057 [US4] Register `make_calculator_tool` in `get_tools()` in `src/financial_agent/tools/__init__.py`
-- [ ] T058 [P] [US4] Create the dataset `tests/eval/datasets/calc.jsonl` with ≥ 20 financial calculation requests in natural language (compound and simple interest, percentages, instalments, a conversion combined with a quote using a fixed rate) and `expected_result` (2 places)
-- [ ] T059 [US4] Implement the eval `tests/eval/test_calc.py` (`@pytest.mark.eval`): check that 100% of the answers contain the correct `expected_result` and that there is a `calculation` source in `sources` (SC-004, FR-007)
+- [X] T056 [US4] Implement the factory `make_calculator_tool()` returning `calculate(expression: str)` in `src/financial_agent/tools/calculator.py` with `@tool(response_format="content_and_artifact")` and the docstring EXACTLY as in `contracts/tools.md`. Evaluate via `ast.parse(expr, mode="eval")` with a whitelist of nodes (`Expression`, `BinOp`, `UnaryOp`, `Constant` numeric only, operators `Add, Sub, Mult, Div, Pow, Mod, USub, UAdd`), using `Decimal` with `localcontext(prec=28)`. Limits: 200 characters, exponent ≤ 1000. Round to 2 places with `ROUND_HALF_EVEN` in the content (`"<expr> = <result>"`). `eval`/`exec` are FORBIDDEN
+- [X] T057 [US4] Register `make_calculator_tool` in `get_tools()` in `src/financial_agent/tools/__init__.py`
+- [X] T058 [P] [US4] Create the dataset `tests/eval/datasets/calc.jsonl` with ≥ 20 financial calculation requests in natural language (compound and simple interest, percentages, instalments, a conversion combined with a quote using a fixed rate) and `expected_result` (2 places)
+- [X] T059 [US4] Implement the eval `tests/eval/test_calc.py` (`@pytest.mark.eval`): check that 100% of the answers contain the correct `expected_result` and that there is a `calculation` source in `sources` (SC-004, FR-007)
 
 **Checkpoint**: todas as histórias funcionam de forma independente
 

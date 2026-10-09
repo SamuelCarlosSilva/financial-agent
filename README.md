@@ -7,9 +7,9 @@ Assistente financeiro conversacional exposto como API REST. Construído com **Fa
 **pgvector**) e **sempre cita as fontes** usadas. Quando a informação não está nas fontes, ele
 diz que não encontrou em vez de inventar.
 
-> **Status:** em desenvolvimento. A busca em documentos (US1), o guardrail de escopo (US2), a
-> cotação de moedas (US3) e o histórico de conversas (US5) estão prontos; a calculadora está no
-> [roadmap](#roadmap).
+> **Status:** em desenvolvimento. As cinco histórias estão prontas: busca em documentos (US1),
+> guardrail de escopo (US2), cotação de moedas (US3), calculadora (US4) e histórico de conversas
+> (US5). Falta o polimento do [roadmap](#roadmap).
 
 ## Sumário
 
@@ -33,7 +33,7 @@ diz que não encontrou em vez de inventar.
 | US1 | Perguntas respondidas com base nos documentos, com fontes citadas | ✅ Pronta |
 | US2 | Guardrail de escopo: recusa perguntas fora de finanças e tentativas de *prompt injection* | ✅ Pronta |
 | US3 | Cotação de moedas em tempo real (AwesomeAPI) | ✅ Pronta |
-| US4 | Calculadora financeira segura (sem `eval`) | 🚧 Planejada |
+| US4 | Calculadora financeira segura (sem `eval`) | ✅ Pronta |
 | US5 | Histórico de conversas (`GET /v1/threads/{id}/messages`) e retenção com expurgo | ✅ Pronta |
 
 Especificação completa em [`specs/001-financial-assistant-api/spec.md`](specs/001-financial-assistant-api/spec.md)
@@ -73,9 +73,13 @@ flowchart LR
   - `get_currency_quote`: cotação em tempo real na AwesomeAPI (compra, venda e data/hora no
     horário de Brasília), com uma nova tentativa em *timeout* ou erro 5xx. Se o par não existir
     ou o provedor estiver fora, devolve uma mensagem de erro sem nenhum valor, para o agente
-    não estimar a cotação.
-- **`collect_sources`**: extrai as citações (`DocumentSource`, `FxQuoteSource`) dos resultados
-  das ferramentas do turno atual.
+    não estimar a cotação;
+  - `calculate`: avalia expressões aritméticas (`+ - * / ** %` e parênteses) com `Decimal`,
+    percorrendo a AST com uma lista fechada de nós, sem `eval`. O resultado sai com 2 casas
+    (`ROUND_HALF_EVEN`), e os limites são 200 caracteres e expoente até 1000. Divisão por zero,
+    expressão inválida e valor grande demais voltam como mensagem de erro.
+- **`collect_sources`**: extrai as citações (`DocumentSource`, `FxQuoteSource`,
+  `CalculationSource`) dos resultados das ferramentas do turno atual.
 - **`enforce_grounding`**: trava de fundamentação. Se o agente buscou documentos e terminou sem
   nenhuma fonte citada, a resposta é substituída por
   *"Não encontrei essa informação nas fontes disponíveis."*
@@ -101,7 +105,7 @@ src/financial_agent/
 ├── api/           # FastAPI: app, rotas, schemas, erros, autenticação, banco
 ├── graph/         # LangGraph: estado, prompts, nós (agent, grounding) e builder
 ├── rag/           # vector store (pgvector) e CLI de ingestão
-├── tools/         # ferramentas do agente (busca em documentos, cotação de moedas)
+├── tools/         # ferramentas do agente (busca em documentos, cotação, calculadora)
 ├── maintenance/   # expurgo das conversas inativas
 ├── config.py      # configuração tipada via variáveis de ambiente
 └── logging.py     # logs estruturados em JSON
@@ -317,6 +321,11 @@ contexto), 6 ambíguas e 8 mistas. As metas são:
 - 100% das mistas respondidas na parte financeira, com aviso de que o resto foi ignorado;
 - 100% das respostas em pt-BR.
 
+**Avaliação da calculadora** (`tests/eval/test_calc.py`): roda 22 pedidos de cálculo em
+linguagem natural (juros simples e compostos, percentuais, parcelas pela Tabela Price e
+conversões com a taxa informada na pergunta). A meta é 100% das respostas com o resultado
+esperado (aceito como `11268.25`, `11268,25` ou `11.268,25`) e com uma fonte `calculation`.
+
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em cada push na `main` e em cada
 pull request roda lint e tipos, testes unitários e de contrato, testes de integração e o build da
 imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
@@ -333,8 +342,6 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 
 ## Roadmap
 
-- **US4 – Calculadora:** ferramenta `calculate` com avaliação segura por AST e `Decimal`, para
-  que nenhum número venha "de cabeça" do LLM.
 - **Polimento:** relatório consolidado das avaliações, testes de latência e carga, avaliação de
   aviso de "não é recomendação de investimento".
 
