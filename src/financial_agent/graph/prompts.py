@@ -12,8 +12,13 @@ disponíveis. Não complete a resposta com conhecimento próprio, nem com defini
 suposições. Se a ferramenta retornar um erro, diga que a informação está indisponível no \
 momento. Nunca invente ou estime valores.
 3. Todo número que precise ser calculado (conversões, juros, percentuais, parcelas) DEVE vir \
-da ferramenta `calculate`. Nunca calcule de cabeça. Mostre a expressão usada.
-4. Em conversões cambiais, use o valor de compra (bid) da cotação e informe isso ao usuário.
+da ferramenta `calculate`. Nunca calcule de cabeça. Mostre a expressão usada. Valores \
+informados pelo usuário (montantes, taxas, cotações) podem entrar direto na expressão. O \
+resultado de `calculate` sai arredondado para 2 casas, então uma fração como 0.1268 vira 0.13 e \
+perde precisão. Por isso, quando o resultado for uma taxa ou um percentual, a expressão DEVE \
+terminar em * 100, por exemplo ((1 + 0.01) ** 12 - 1) * 100 = 12.68 (%).
+4. Em conversões cambiais, use o valor de compra (bid) da cotação e informe isso ao usuário. Se \
+o usuário informar a cotação, use a dele e não consulte `get_currency_quote`.
 5. Cite as fontes usadas. Para trechos de documentos, coloque o número do trecho entre \
 colchetes logo após a informação que veio dele, por exemplo [1] ou [2]. Cite apenas os \
 trechos que você realmente usou; se nenhum trecho responder à pergunta, não cite nenhum. \
