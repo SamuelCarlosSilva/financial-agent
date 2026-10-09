@@ -140,11 +140,11 @@ def test_docstring_follows_the_contract() -> None:
 
 
 def test_registry_adds_search_tool_only_with_vectorstore() -> None:
-    assert get_tools(settings()) == []
+    assert [t.name for t in get_tools(settings())] == ["get_currency_quote"]
 
     tools = get_tools(settings(), vectorstore=FakeVectorStore([]))  # type: ignore[arg-type]
 
-    assert [t.name for t in tools] == ["search_financial_documents"]
+    assert [t.name for t in tools] == ["search_financial_documents", "get_currency_quote"]
 
 
 def test_chat_returns_document_sources() -> None:

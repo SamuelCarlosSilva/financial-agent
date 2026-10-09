@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 from uuid import uuid4
 
+import httpx
 from fastapi import FastAPI, Request, Response
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
@@ -33,6 +34,8 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.LOG_LEVEL)
     pool = await db.open_pool(settings.DATABASE_URL)
     vectorstore = get_vectorstore(settings, get_embeddings(settings))
+    # Cliente HTTP compartilhado pelas ferramentas (cotação de moedas).
+    http_client = httpx.AsyncClient(timeout=settings.FX_TIMEOUT_SECONDS)
     try:
         checkpointer = await db.setup_checkpointer(pool)
         await db.setup_thread_metadata(pool)
@@ -49,7 +52,7 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
             timeout=settings.LLM_TIMEOUT_SECONDS,
             api_key=settings.OPENAI_API_KEY,
         )
-        tools = get_tools(settings, vectorstore)
+        tools = get_tools(settings, vectorstore, http_client)
         # Compilado uma única vez; o estado da conversa vive só no checkpointer.
         app.state.graph = build_graph(
             checkpointer, llm, tools, guardrail=make_guardrail_node(guardrail_llm)
@@ -61,6 +64,7 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.ping = ping
         yield
     finally:
+        await http_client.aclose()
         await close_vectorstore(vectorstore)
         await pool.close()
 
