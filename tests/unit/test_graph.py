@@ -2,12 +2,15 @@
 
 from decimal import Decimal
 
+from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.errors import GraphRecursionError
 
+from financial_agent.api.app import create_app
 from financial_agent.graph.builder import RECURSION_LIMIT, build_graph
-from financial_agent.graph.nodes.agent import collect_sources
+from financial_agent.graph.nodes.agent import MAX_TOOL_ROUNDS, collect_sources
 from financial_agent.graph.prompts import AGENT_SYSTEM_PROMPT
 from financial_agent.graph.state import CalculationSource
 from tests.fakes import fake_llm
@@ -94,3 +97,51 @@ def test_collect_sources_accepts_list_artifacts_and_ignores_previous_turns() -> 
     result = collect_sources(state)  # type: ignore[arg-type]
 
     assert [s.expression for s in result["turn_sources"]] == ["2"]
+
+
+async def test_tool_rounds_are_capped_and_last_call_has_tools_disabled() -> None:
+    def call(n: int) -> AIMessage:
+        tool_call = {"name": "fake_calc", "args": {"expression": f"{n} + {n}"}, "id": f"c{n}"}
+        return AIMessage("", tool_calls=[tool_call])
+
+    # O LLM continuaria pedindo ferramenta; a resposta final só vem por causa do limite.
+    llm = fake_llm(*(call(n) for n in range(MAX_TOOL_ROUNDS)), AIMessage("Resposta final."))
+    graph = build_graph(InMemorySaver(), llm, tools=[fake_calc])
+
+    state = await graph.ainvoke(
+        {"messages": [HumanMessage("Calcule")], "turn_sources": []}, config=config("t1")
+    )
+
+    assert state["messages"][-1].content == "Resposta final."
+    assert llm.tool_choices == [None] * MAX_TOOL_ROUNDS + ["none"]
+
+
+async def test_tool_rounds_reset_on_each_turn() -> None:
+    tool_call = {"name": "fake_calc", "args": {"expression": "2 + 2"}, "id": "c1"}
+    llm = fake_llm(
+        AIMessage("", tool_calls=[tool_call]),
+        AIMessage("4.00"),
+        AIMessage("", tool_calls=[{**tool_call, "id": "c2"}]),
+        AIMessage("4.00 de novo"),
+    )
+    graph = build_graph(InMemorySaver(), llm, tools=[fake_calc])
+
+    for message in ("Quanto é 2+2?", "E de novo?"):
+        await graph.ainvoke(
+            {"messages": [HumanMessage(message)], "turn_sources": []}, config=config("t1")
+        )
+
+    assert llm.tool_choices == [None, None, None, None]
+
+
+class RecursingGraph:
+    async def ainvoke(self, *args: object, **kwargs: object) -> None:
+        raise GraphRecursionError("Recursion limit reached")
+
+
+def test_recursion_error_returns_503() -> None:
+    with TestClient(create_app(graph=RecursingGraph())) as client:  # type: ignore[arg-type]
+        response = client.post("/v1/chat", json={"message": "Oi"})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "upstream_unavailable"

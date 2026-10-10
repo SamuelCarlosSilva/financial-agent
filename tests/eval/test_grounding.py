@@ -101,7 +101,12 @@ def results() -> Iterator[list[dict[str, Any]]]:
     with TestClient(create_app()) as client:
         for case in load_jsonl(DATASET):
             response = client.post("/v1/chat", json={"message": case["question"]})
-            assert response.status_code == 200, response.text
+            # Uma pergunta com erro conta como falha, sem derrubar o eval inteiro.
+            if response.status_code != 200:
+                rows.append(
+                    {**case, "answer": "", "sources": [], "verdict": None, "error": response.text}
+                )
+                continue
             body = response.json()
             verdict = judge(
                 body["answer"], with_full_text(body["sources"], texts), case["question"]
@@ -114,6 +119,10 @@ def results() -> Iterator[list[dict[str, Any]]]:
     FAILURES.parent.mkdir(parents=True, exist_ok=True)
     with FAILURES.open("w", encoding="utf-8") as out:
         for row in rows:
+            if row.get("error"):
+                record = {"question": row["question"], "error": row["error"]}
+                out.write(json.dumps(record, ensure_ascii=False) + "\n")
+                continue
             verdict: Verdict = row["verdict"]
             if not verdict.fully_supported:
                 record = {
@@ -132,6 +141,11 @@ def answerable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def unanswerable(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [r for r in rows if r.get("expect_not_found")]
+
+
+def test_all_requests_succeed(results: list[dict[str, Any]]) -> None:
+    errors = {r["question"]: r["error"] for r in results if r.get("error")}
+    assert not errors, f"perguntas com erro na API: {errors}"
 
 
 def test_answerable_questions_accuracy(results: list[dict[str, Any]]) -> None:
@@ -165,7 +179,7 @@ def test_unanswerable_questions_cite_no_documents(results: list[dict[str, Any]])
 
 
 def test_all_claims_supported_and_in_pt_br(results: list[dict[str, Any]]) -> None:
-    summary = aggregate([r["verdict"] for r in results])
+    summary = aggregate([r["verdict"] for r in results if r["verdict"] is not None])
     assert summary.supported_rate == 1.0, (
         f"{summary.claims - summary.supported_claims} de {summary.claims} afirmações sem "
         f"fonte (SC-002); detalhes em {FAILURES.relative_to(ROOT)}"
