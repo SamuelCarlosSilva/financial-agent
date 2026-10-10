@@ -6,6 +6,7 @@ import psycopg_pool
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from langgraph.errors import GraphRecursionError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from financial_agent.api.schemas import ErrorBody, ErrorDetail
@@ -69,6 +70,12 @@ async def _upstream_handler(_: Request, exc: Exception) -> JSONResponse:
     return error_response(503, "upstream_unavailable", "Serviço temporariamente indisponível.")
 
 
+async def _recursion_handler(_: Request, exc: Exception) -> JSONResponse:
+    # O agente é limitado por MAX_TOOL_ROUNDS; chegar aqui indica um laço inesperado no grafo.
+    log.error("graph_recursion_limit", error_type=type(exc).__name__)
+    return error_response(503, "upstream_unavailable", "Serviço temporariamente indisponível.")
+
+
 async def _http_handler(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, StarletteHTTPException)
     code = "not_found" if exc.status_code == 404 else "http_error"
@@ -80,5 +87,6 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotFoundError, _not_found_handler)
     app.add_exception_handler(UnauthorizedError, _unauthorized_handler)
     app.add_exception_handler(StarletteHTTPException, _http_handler)
+    app.add_exception_handler(GraphRecursionError, _recursion_handler)
     for exc_type in UPSTREAM_ERRORS:
         app.add_exception_handler(exc_type, _upstream_handler)
