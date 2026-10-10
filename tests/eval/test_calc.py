@@ -55,7 +55,10 @@ def results() -> Iterator[list[dict[str, Any]]]:
     with TestClient(create_app()) as client:
         for case in load_jsonl(DATASET):
             response = client.post("/v1/chat", json={"message": case["question"]})
-            assert response.status_code == 200, response.text
+            # Uma pergunta com erro conta como falha, sem derrubar o eval inteiro.
+            if response.status_code != 200:
+                rows.append({**case, "answer": "", "sources": [], "error": response.text})
+                continue
             body = response.json()
             rows.append({**case, "answer": body["answer"], "sources": body["sources"]})
 
