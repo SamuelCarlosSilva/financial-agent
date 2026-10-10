@@ -37,7 +37,7 @@ LangChain e a suíte `eval` com o LLM real
 (SC-006). A meta inicial é de 20 requisições concorrentes por instância.
 
 **Constraints**: nenhum estado em memória entre requisições. Timeout de 5 s no provedor de câmbio
-e de 30 s no LLM. `recursion_limit=12` no grafo. Mensagens de até 4000 caracteres. Retenção de 30
+e de 30 s no LLM. No máximo 4 rodadas de ferramenta por turno (`MAX_TOOL_ROUNDS`) e `recursion_limit=16` no grafo. Mensagens de até 4000 caracteres. Retenção de 30
 dias.
 
 **Scale/Scope**: v1 com até cerca de 1.000 documentos (≈ 50k trechos), dezenas de usuários

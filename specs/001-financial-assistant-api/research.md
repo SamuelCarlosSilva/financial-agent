@@ -46,7 +46,7 @@ armazenamento e embeddings foram confirmadas pelo solicitante em 2026-09-27.
 
 - **Decision**: um `StateGraph` com `MessagesState` estendido, contendo os nós `guardrail`,
   `refuse`, `clarify`, `agent` (LLM com `bind_tools`) e `tools` (`ToolNode`). A condição
-  `tools_condition` faz o laço agent↔tools. O limite é `recursion_limit=12`.
+  `tools_condition` faz o laço agent↔tools. O agente faz no máximo 4 rodadas de ferramenta por turno (`MAX_TOOL_ROUNDS`; na última, `tool_choice="none"` força a resposta) e o `recursion_limit=16` fica como rede de segurança.
 - **Rationale**: é o padrão ReAct do LangGraph, com o controle explícito necessário para
   encaixar o guardrail antes. Isso é mais transparente que `create_react_agent` e mantém o
   guardrail como nó próprio.
