@@ -15,15 +15,17 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from financial_agent.graph.nodes.agent import collect_sources, make_agent_node
+from financial_agent.graph.nodes.agent import MAX_TOOL_ROUNDS, collect_sources, make_agent_node
 from financial_agent.graph.nodes.clarify import clarify
 from financial_agent.graph.nodes.grounding import enforce_grounding
 from financial_agent.graph.nodes.guardrail import GuardrailNode, route_after_guardrail
 from financial_agent.graph.nodes.refuse import refuse
 from financial_agent.graph.state import GraphState
 
-# Usado no config de cada invocação (agent ⇄ tools não pode girar indefinidamente).
-RECURSION_LIMIT = 12
+# Usado no config de cada invocação. Cada nó executado gasta um passo: guardrail, resposta final
+# do agent, collect_sources e enforce_grounding (4), mais 2 por rodada agent → tools. O laço já é
+# limitado por MAX_TOOL_ROUNDS; a folga de 4 passos é só uma rede de segurança.
+RECURSION_LIMIT = 4 + 2 * MAX_TOOL_ROUNDS + 4
 
 
 def build_graph(

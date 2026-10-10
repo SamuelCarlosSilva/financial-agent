@@ -1,7 +1,7 @@
 """Fakes compartilhados pelos testes (sem rede, sem OpenAI)."""
 
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
@@ -13,9 +13,13 @@ from financial_agent.graph.state import ScopeDecision
 
 
 class FakeToolChatModel(FakeMessagesListChatModel):
-    """Chat model roteirizado que aceita `bind_tools` e registra cada entrada recebida."""
+    """Chat model roteirizado que aceita `bind_tools` e registra cada entrada recebida.
+
+    `tool_choices` guarda o `tool_choice` do modelo vinculado em cada chamada.
+    """
 
     calls: list[list[BaseMessage]] = []
+    tool_choices: list[str | None] = []
 
     def bind_tools(
         self,
@@ -24,7 +28,15 @@ class FakeToolChatModel(FakeMessagesListChatModel):
         tool_choice: str | None = None,
         **kwargs: Any,
     ) -> Runnable[LanguageModelInput, AIMessage]:
-        return self
+        def run(messages: LanguageModelInput) -> AIMessage:
+            self.tool_choices.append(tool_choice)
+            return cast(AIMessage, self.invoke(messages))
+
+        async def arun(messages: LanguageModelInput) -> AIMessage:
+            self.tool_choices.append(tool_choice)
+            return cast(AIMessage, await self.ainvoke(messages))
+
+        return RunnableLambda(run, afunc=arun)
 
     def _generate(self, messages: list[BaseMessage], *args: Any, **kwargs: Any) -> Any:
         self.calls.append(list(messages))
@@ -32,7 +44,7 @@ class FakeToolChatModel(FakeMessagesListChatModel):
 
 
 def fake_llm(*responses: BaseMessage) -> FakeToolChatModel:
-    return FakeToolChatModel(responses=list(responses), calls=[])
+    return FakeToolChatModel(responses=list(responses), calls=[], tool_choices=[])
 
 
 class FakeScopeModel(FakeToolChatModel):

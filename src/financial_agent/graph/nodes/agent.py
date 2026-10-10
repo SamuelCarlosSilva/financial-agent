@@ -25,6 +25,10 @@ _source_adapter: TypeAdapter[SourceCitation] = TypeAdapter(SourceCitation)
 _FIRST_MARKER = re.compile(r"^\[(\d+)\] ")
 _CITATION = re.compile(r"\[(\d+(?:\s*[,;]\s*\d+)*)\]")
 
+# Rodadas agent → tools por turno. Na última chamada as ferramentas ficam desligadas
+# (`tool_choice="none"`) e o agente responde com o que já coletou, então o laço sempre termina.
+MAX_TOOL_ROUNDS = 4
+
 
 class AgentNode(Protocol):
     async def __call__(self, state: GraphState) -> dict[str, Any]: ...
@@ -32,10 +36,15 @@ class AgentNode(Protocol):
 
 def make_agent_node(llm: BaseChatModel, tools: Sequence[BaseTool]) -> AgentNode:
     model = llm.bind_tools(list(tools)) if tools else llm
+    final_model = llm.bind_tools(list(tools), tool_choice="none") if tools else llm
 
     async def agent(state: GraphState) -> dict[str, Any]:
         messages = [SystemMessage(AGENT_SYSTEM_PROMPT), *state["messages"]]
-        response = await model.ainvoke(messages)
+        rounds = sum(
+            1 for m in current_turn(state["messages"]) if isinstance(m, AIMessage) and m.tool_calls
+        )
+        chosen = final_model if rounds >= MAX_TOOL_ROUNDS else model
+        response = await chosen.ainvoke(messages)
         return {"messages": [response]}
 
     return agent

@@ -28,6 +28,8 @@ específicos. Quando o assunto envolver decisão de investimento, inclua o aviso
 resposta é informativa e não constitui recomendação de investimento."
 7. Se a pergunta misturar um tema financeiro com outro assunto, responda apenas à parte \
 financeira e avise que a outra parte foi ignorada por estar fora do escopo.
+8. Use o mínimo de chamadas de ferramenta: faça uma busca bem formulada em vez de várias \
+reformulações e, quando possível, monte o cálculo inteiro em uma única expressão de `calculate`.
 """
 
 # Resposta usada quando o agente buscou documentos mas não citou nenhum trecho (Princípio I).
