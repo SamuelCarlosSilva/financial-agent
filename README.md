@@ -7,9 +7,10 @@ Assistente financeiro conversacional exposto como API REST. Construído com **Fa
 **pgvector**) e **sempre cita as fontes** usadas. Quando a informação não está nas fontes, ele
 diz que não encontrou em vez de inventar.
 
-> **Status:** em desenvolvimento. As cinco histórias estão prontas: busca em documentos (US1),
-> guardrail de escopo (US2), cotação de moedas (US3), calculadora (US4) e histórico de conversas
-> (US5). Falta o polimento do [roadmap](#roadmap).
+> **Status:** as cinco histórias estão prontas: busca em documentos (US1), guardrail de escopo
+> (US2), cotação de moedas (US3), calculadora (US4) e histórico de conversas (US5). O polimento
+> (Fase 8) trouxe o relatório consolidado das avaliações, os evals de acompanhamento, latência e
+> recomendação e a validação manual do quickstart. Pendências conhecidas no [roadmap](#roadmap).
 
 ## Sumário
 
@@ -66,7 +67,11 @@ flowchart LR
 - **`refuse`** / **`clarify`**: devolvem uma mensagem fixa (recusa padrão ou pedido de
   esclarecimento), sem chamar o LLM nem ferramentas.
 - **`agent`**: LLM (`gpt-4o-mini` por padrão) com as ferramentas vinculadas e um *system prompt*
-  em pt-BR que exige respostas baseadas só no retorno das ferramentas.
+  em pt-BR que exige respostas baseadas só no retorno das ferramentas chamadas no próprio turno.
+  Dos turnos anteriores, o agente vê só as perguntas e as respostas finais, sem as chamadas e os
+  resultados de ferramentas, para que cada resposta traga as próprias fontes. O laço
+  agent ⇄ tools tem no máximo 4 rodadas por turno (`MAX_TOOL_ROUNDS`); na última, as ferramentas
+  são desligadas (`tool_choice="none"`) e o agente responde com o que já coletou.
 - **`tools`**: executa as ferramentas pedidas pelo agente:
   - `search_financial_documents`: busca por similaridade no pgvector, descartando trechos abaixo
     de `RAG_MIN_SCORE`;
@@ -80,8 +85,8 @@ flowchart LR
     expressão inválida e valor grande demais voltam como mensagem de erro.
 - **`collect_sources`**: extrai as citações (`DocumentSource`, `FxQuoteSource`,
   `CalculationSource`) dos resultados das ferramentas do turno atual.
-- **`enforce_grounding`**: trava de fundamentação. Se o agente buscou documentos e terminou sem
-  nenhuma fonte citada, a resposta é substituída por
+- **`enforce_grounding`**: trava de fundamentação. Se o agente buscou documentos, ou citou um
+  trecho `[n]`, e terminou o turno sem nenhuma fonte, a resposta é substituída por
   *"Não encontrei essa informação nas fontes disponíveis."*
 
 **API stateless, estado no `thread_id`.** A aplicação não guarda conversa em memória: o histórico
@@ -119,6 +124,9 @@ specs/             # especificação, plano, contratos e tarefas (spec-kit)
 ```
 
 ## Como rodar
+
+O roteiro completo, com os 12 cenários de validação manual, está em
+[`quickstart.md`](specs/001-financial-assistant-api/quickstart.md).
 
 ### Pré-requisitos
 
@@ -291,6 +299,7 @@ caderneta de poupança e tributação de renda fixa.
 uv run pytest -m "not eval and not integration"     # unitários e de contrato (sem rede, sem banco)
 uv run pytest -m integration                        # Postgres + pgvector reais via testcontainers (requer Docker)
 uv run pytest -m eval                               # LLM real: custa tokens, usa o .env
+uv run python -m tests.eval.report                  # roda os evals e imprime a tabela PASS/FAIL
 
 uv run ruff check .
 uv run ruff format --check .
@@ -326,6 +335,28 @@ linguagem natural (juros simples e compostos, percentuais, parcelas pela Tabela 
 conversões com a taxa informada na pergunta). A meta é 100% das respostas com o resultado
 esperado (aceito como `11268.25`, `11268,25` ou `11.268,25`) e com uma fonte `calculation`.
 
+**Avaliação de acompanhamentos** (`tests/eval/test_followup.py`): roda 22 conversas de 2 ou 3
+turnos em que a última mensagem depende do contexto ("E o euro?", "E se fossem 24 meses?",
+"Quanto são 500 disso em reais?"). A interpretação é conferida pela ferramenta chamada e pelos
+argumentos gravados no estado da thread. Em uma variante de controle, a última mensagem vai
+sozinha para outra thread, e os argumentos não podem trazer nada da conversa original. As metas
+são ≥ 90% de acompanhamentos corretos e nenhum vazamento entre threads.
+
+**Avaliação de recomendação** (`tests/eval/test_advice.py`): roda 10 pedidos de recomendação
+("Devo comprar ações da Petrobras?", "Onde invisto meus R$ 10 mil?"). A meta é 100% das respostas
+com o aviso de que não são recomendação de investimento e nenhuma ordem de compra ou venda de
+ativo específico.
+
+**Avaliação de latência** (`tests/eval/test_latency.py`): mede o `POST /v1/chat` nas perguntas de
+fundamentação, cálculo e nas financeiras do escopo, uma de cada vez e depois com 20 requisições
+simultâneas. As metas são p95 ≤ 10 s nos dois cenários e nenhum erro 5xx.
+
+**Relatório consolidado** (`tests/eval/report.py`): roda todos os evals e imprime uma tabela com
+SC-001 a SC-006, FR-014 e o aviso de recomendação (meta, resultado e PASS/FAIL). Cada eval grava
+suas métricas em `tests/eval/out/metrics/`; uma métrica que não foi gravada aparece como
+"não medido" e conta como falha. Com `--no-run`, só imprime a tabela da última execução. O SC-007
+(histórico após reinício) é coberto pelo teste de integração `test_thread_memory.py`.
+
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em cada push na `main` e em cada
 pull request roda lint e tipos, testes unitários e de contrato, testes de integração e o build da
 imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
@@ -337,13 +368,28 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 - O `thread_id` é um identificador, não uma credencial: quem o conhece pode continuar a conversa
   e ler todo o histórico em `GET /v1/threads/{id}/messages`.
 - O `.env` nunca deve ser versionado; use o `.env.example` como modelo.
-- Os logs são JSON estruturado, com `request_id` por requisição; o conteúdo das mensagens é
-  truncado e as chaves nunca são registradas.
+- Os logs são JSON estruturado, com `request_id` por requisição. O evento `chat_turn` registra a
+  decisão do guardrail, as ferramentas chamadas, as fontes (tipo e identificador), a latência e
+  o consumo de tokens do agente, sem o conteúdo da pergunta nem da resposta. As chaves nunca são
+  registradas.
 
 ## Roadmap
 
-- **Polimento:** relatório consolidado das avaliações, testes de latência e carga, avaliação de
-  aviso de "não é recomendação de investimento".
+Pendências encontradas na validação da Fase 8 (detalhes em
+[`quickstart-validation.md`](specs/001-financial-assistant-api/checklists/quickstart-validation.md)):
+
+- **Conversão com cotação de um turno anterior:** em "Quanto são 500 disso em reais?", o agente
+  às vezes usa o bid que aparece na resposta anterior, em vez de consultar a cotação no turno. O
+  cálculo sai com fonte, mas a cotação usada não aparece em `sources`.
+- **Falha do guardrail vira recusa:** se a chamada ao classificador falha (por exemplo, por
+  *timeout* da OpenAI), a mensagem é tratada como fora de escopo, por decisão de projeto. Para o
+  usuário, uma pergunta financeira legítima aparece como recusada.
+- **Fundamentação e aviso instáveis:** no último relatório, 15 de 16 metas foram atingidas. O
+  SC-002 (100% das afirmações com fonte) oscila em torno de 97%, também na `main`, e o aviso de
+  recomendação oscila entre 90% e 100%.
+- **Tipos no checkpoint:** o LangGraph avisa que vai bloquear a leitura de tipos não registrados
+  (`ScopeDecision`, `DocumentSource`, `FxQuoteSource`). É preciso registrá-los em
+  `allowed_msgpack_modules`.
 
 ## Desenvolvimento
 
