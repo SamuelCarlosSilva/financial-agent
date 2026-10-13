@@ -1,0 +1,22 @@
+{"turns": ["Quanto rendem R$ 10.000 a juros compostos de 1% ao mês por 12 meses?", "E se fossem 24 meses?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["10000", "24"]}, "leak_markers": ["10000"]}
+{"turns": ["Qual o montante de R$ 7.500 a juros compostos de 0,9% ao mês por 18 meses?", "E com taxa de 1,2% ao mês?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["7500", "18"]}, "leak_markers": ["7500"]}
+{"turns": ["Quanto é 15% de R$ 3.200?", "E 20%?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["3200"]}, "leak_markers": ["3200"]}
+{"turns": ["Quanto dá R$ 2.000 com juros simples de 2% ao mês por 6 meses?", "E por 10 meses?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["2000", "10"]}, "leak_markers": ["2000"]}
+{"turns": ["Quanto rendem R$ 4.000 a 12% ao ano em juros compostos por 3 anos?", "E se eu aplicasse R$ 6.000?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["6000", ["0.12", "1.12", "12/100"]]}, "leak_markers": ["0.12", "1.12", "12/100"]}
+{"turns": ["Uma TV custa R$ 4.500. Quanto fica com 10% de desconto?", "E com 15%?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["4500"]}, "leak_markers": ["4500"]}
+{"turns": ["Qual a parcela de um financiamento de R$ 30.000 em 24 meses a 1,5% ao mês pela Tabela Price?", "E em 36 meses?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["30000", "36"]}, "leak_markers": ["30000"]}
+{"turns": ["Quanto rendem R$ 8.000 a 0,8% ao mês por 12 meses em juros compostos?", "E em 24 meses?", "E se a taxa fosse 1% ao mês?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["8000"]}, "leak_markers": ["8000"]}
+{"turns": ["Meu salário é R$ 5.000 e recebi um aumento de 8%. Quanto passo a ganhar?", "E se o aumento fosse de 12%?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["5000"]}, "leak_markers": ["5000"]}
+{"turns": ["Quanto é 2,5% de R$ 12.000?", "E 3,5%?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["12000"]}, "leak_markers": ["12000"]}
+{"turns": ["Quanto está o dólar hoje?", "E o euro?"], "expected_tool": "get_currency_quote", "expected_args_contains": {"base": ["EUR"]}, "leak_markers": ["USD"]}
+{"turns": ["Qual a cotação do euro?", "E a libra?"], "expected_tool": "get_currency_quote", "expected_args_contains": {"base": ["GBP"]}, "leak_markers": ["EUR"]}
+{"turns": ["Quanto está a libra esterlina?", "E o iene?"], "expected_tool": "get_currency_quote", "expected_args_contains": {"base": ["JPY"]}, "leak_markers": ["GBP"]}
+{"turns": ["Qual a cotação do dólar canadense?", "E o australiano?"], "expected_tool": "get_currency_quote", "expected_args_contains": {"base": ["AUD"]}, "leak_markers": ["CAD"]}
+{"turns": ["Quanto vale o franco suíço em reais?", "E o dólar americano?"], "expected_tool": "get_currency_quote", "expected_args_contains": {"base": ["USD"]}, "leak_markers": ["CHF"]}
+{"turns": ["Quanto está o dólar?", "E o euro?", "E o peso argentino?"], "expected_tool": "get_currency_quote", "expected_args_contains": {"base": ["ARS"]}, "leak_markers": ["USD", "EUR"]}
+{"turns": ["Qual a cotação do euro hoje?", "Quanto são 500 disso em reais?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["500"]}, "leak_markers": ["EUR"]}
+{"turns": ["Quanto está a libra hoje?", "Converta 200 disso para reais."], "expected_tool": "calculate", "expected_args_contains": {"expression": ["200"]}, "leak_markers": ["GBP"]}
+{"turns": ["Quanto está o dólar hoje?", "E o euro?", "Quanto são 300 dessa última moeda em reais?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["300"]}, "leak_markers": ["EUR"]}
+{"turns": ["O que é come-cotas?", "E em quais meses ele é cobrado?"], "expected_tool": "search_financial_documents", "expected_args_contains": {"query": ["come"]}, "leak_markers": ["come"]}
+{"turns": ["O que é o FGC?", "Qual o limite de garantia dele por CPF?"], "expected_tool": "search_financial_documents", "expected_args_contains": {"query": [["fgc", "garantidor"]]}, "leak_markers": ["fgc", "garantidor"]}
+{"turns": ["Como funciona a caderneta de poupança?", "E quanto ela rende?"], "expected_tool": "search_financial_documents", "expected_args_contains": {"query": ["poupanca"]}, "leak_markers": ["poupanca"]}
