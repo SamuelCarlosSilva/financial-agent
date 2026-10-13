@@ -1,10 +1,10 @@
-"""Trava de fundamentação: resposta após busca em documentos sem nenhuma citação não sai."""
+"""Trava de fundamentação: resposta sem fonte no turno, após busca ou citando trechos, não sai."""
 
 from typing import Any
 
 from langchain_core.messages import AIMessage
 
-from financial_agent.graph.nodes.agent import current_turn
+from financial_agent.graph.nodes.agent import cited_markers, current_turn
 from financial_agent.graph.prompts import NOT_FOUND_MESSAGE
 from financial_agent.graph.state import GraphState
 from financial_agent.logging import get_logger, truncate
@@ -14,11 +14,13 @@ log = get_logger(__name__)
 
 
 def enforce_grounding(state: GraphState) -> dict[str, Any]:
-    """Troca pela mensagem padrão a resposta de um turno que buscou documentos e ficou sem fontes.
+    """Troca pela mensagem padrão a resposta sem fontes de um turno que buscou ou citou trechos.
 
     Sem trecho citado e sem outra fonte (cotação, cálculo), o que o agente afirmou não veio das
-    ferramentas: ou ele não encontrou a informação, ou respondeu de cabeça. Roda depois de
-    `collect_sources`, que só mantém os trechos citados.
+    ferramentas: ou ele não encontrou a informação, ou respondeu de cabeça. Também vale para
+    uma resposta que cita [n] sem ter buscado neste turno: o trecho é de um turno anterior e
+    não seria devolvido em `sources`. Roda depois de `collect_sources`, que só mantém os trechos
+    citados.
     """
     turn = current_turn(state["messages"])
     searched = any(
@@ -28,7 +30,9 @@ def enforce_grounding(state: GraphState) -> dict[str, Any]:
         for call in message.tool_calls
     )
     final = next((m for m in reversed(turn) if isinstance(m, AIMessage)), None)
-    if not searched or state.get("turn_sources") or final is None:
+    if final is None or state.get("turn_sources"):
+        return {}
+    if not (searched or cited_markers(final.text)):
         return {}
 
     log.warning("ungrounded_answer_replaced", answer=truncate(final.text))

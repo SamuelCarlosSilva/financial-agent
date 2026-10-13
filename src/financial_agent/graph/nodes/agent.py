@@ -39,7 +39,7 @@ def make_agent_node(llm: BaseChatModel, tools: Sequence[BaseTool]) -> AgentNode:
     final_model = llm.bind_tools(list(tools), tool_choice="none") if tools else llm
 
     async def agent(state: GraphState) -> dict[str, Any]:
-        messages = [SystemMessage(AGENT_SYSTEM_PROMPT), *state["messages"]]
+        messages = [SystemMessage(AGENT_SYSTEM_PROMPT), *agent_view(state["messages"])]
         rounds = sum(
             1 for m in current_turn(state["messages"]) if isinstance(m, AIMessage) and m.tool_calls
         )
@@ -48,6 +48,23 @@ def make_agent_node(llm: BaseChatModel, tools: Sequence[BaseTool]) -> AgentNode:
         return {"messages": [response]}
 
     return agent
+
+
+def agent_view(messages: Sequence[BaseMessage]) -> list[BaseMessage]:
+    """O que o agente vê: a conversa visível dos turnos anteriores e o turno atual inteiro.
+
+    Chamadas e resultados de ferramentas de turnos anteriores ficam de fora. Assim cada
+    resposta se apoia em ferramentas chamadas no próprio turno e sai com as fontes dele
+    (Princípio I), em vez de reaproveitar uma cotação ou um trecho antigo sem citá-lo.
+    """
+    turn = current_turn(messages)
+    earlier = messages[: len(messages) - len(turn)]
+    visible = [
+        m
+        for m in earlier
+        if isinstance(m, HumanMessage) or (isinstance(m, AIMessage) and not m.tool_calls)
+    ]
+    return [*visible, *turn]
 
 
 def current_turn(messages: Sequence[BaseMessage]) -> Sequence[BaseMessage]:

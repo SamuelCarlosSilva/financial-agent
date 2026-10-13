@@ -145,3 +145,29 @@ def test_recursion_error_returns_503() -> None:
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "upstream_unavailable"
+
+
+async def test_agent_does_not_see_tool_messages_from_earlier_turns() -> None:
+    tool_call = {"name": "fake_calc", "args": {"expression": "2 + 2"}, "id": "c1"}
+    llm = fake_llm(
+        AIMessage("", tool_calls=[tool_call]),
+        AIMessage("2 + 2 = 4.00"),
+        AIMessage("De nada!"),
+    )
+    graph = build_graph(InMemorySaver(), llm, tools=[fake_calc])
+
+    for message in ("Quanto é 2+2?", "Obrigado"):
+        await graph.ainvoke(
+            {"messages": [HumanMessage(message)], "turn_sources": []}, config=config("t1")
+        )
+
+    second_turn_input = llm.calls[-1]
+    assert [type(m).__name__ for m in second_turn_input] == [
+        "SystemMessage",
+        "HumanMessage",
+        "AIMessage",
+        "HumanMessage",
+    ]
+    assert second_turn_input[2].content == "2 + 2 = 4.00"
+    # O turno atual continua vendo as próprias chamadas de ferramenta.
+    assert any(isinstance(m, ToolMessage) for m in llm.calls[1])

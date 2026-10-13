@@ -293,3 +293,11 @@ async def test_turn_without_search_is_not_touched() -> None:
     _, state = await run_graph(FakeVectorStore([]), AIMessage("Olá! Como posso ajudar?"))
 
     assert state["messages"][-1].content == "Olá! Como posso ajudar?"
+
+
+async def test_citation_without_search_in_the_turn_is_replaced() -> None:
+    # Acompanhamento respondido com o trecho de um turno anterior: o [1] não teria fonte.
+    _, state = await run_graph(FakeVectorStore([]), AIMessage("É cobrado em maio e novembro [1]."))
+
+    assert state["messages"][-1].content == NOT_FOUND_MESSAGE
+    assert state["turn_sources"] == []
