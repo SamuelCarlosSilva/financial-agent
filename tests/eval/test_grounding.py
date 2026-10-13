@@ -27,6 +27,8 @@ from tests.eval.common import (
     ingest_docs,
     load_jsonl,
     normalize,
+    pct,
+    record_metric,
 )
 from tests.eval.judge import Verdict, aggregate, judge
 
@@ -159,6 +161,7 @@ def test_answerable_questions_accuracy(results: list[dict[str, Any]]) -> None:
         )
     ]
     accuracy = 1 - len(misses) / len(rows)
+    record_metric("sc003_answerable", pct(accuracy), accuracy >= 0.90)
     assert accuracy >= 0.90, f"acerto {accuracy:.0%} < 90% (SC-003); erros: {misses}"
 
 
@@ -166,6 +169,7 @@ def test_unanswerable_questions_say_not_found(results: list[dict[str, Any]]) -> 
     rows = unanswerable(results)
     misses = [r["question"] for r in rows if not says_not_found(r["answer"])]
     rate = 1 - len(misses) / len(rows)
+    record_metric("sc003_not_found", pct(rate), rate >= 0.95)
     assert rate >= 0.95, f'"não encontrei" em {rate:.0%} < 95% (SC-003); erros: {misses}'
 
 
@@ -180,6 +184,8 @@ def test_unanswerable_questions_cite_no_documents(results: list[dict[str, Any]])
 
 def test_all_claims_supported_and_in_pt_br(results: list[dict[str, Any]]) -> None:
     summary = aggregate([r["verdict"] for r in results if r["verdict"] is not None])
+    record_metric("sc002_supported", pct(summary.supported_rate), summary.supported_rate == 1.0)
+    record_metric("fr014_grounding", pct(summary.pt_br_rate), summary.pt_br_rate == 1.0)
     assert summary.supported_rate == 1.0, (
         f"{summary.claims - summary.supported_claims} de {summary.claims} afirmações sem "
         f"fonte (SC-002); detalhes em {FAILURES.relative_to(ROOT)}"
