@@ -78,6 +78,7 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     sources: list[SourceCitation] = state.get("turn_sources") or []
 
     tools_called = [call["name"] for m in turn if isinstance(m, AIMessage) for call in m.tool_calls]
+    # Só o conteúdo de controle vai para o log: nada da mensagem do usuário nem da resposta.
     log.info(
         "chat_turn",
         thread_id=str(thread_id),
@@ -87,9 +88,21 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
         tools_called=tools_called,
         sources=[_source_ref(source) for source in sources],
         latency_ms=round((time.perf_counter() - started) * 1000),
+        tokens=_token_usage(turn),
     )
 
     return ChatResponse(thread_id=thread_id, answer=answer, scope=scope, sources=sources)
+
+
+def _token_usage(turn: Sequence[BaseMessage]) -> dict[str, int]:
+    """Soma o `usage_metadata` das chamadas do agente no turno (o guardrail não entra)."""
+    usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+    for message in turn:
+        if isinstance(message, AIMessage) and message.usage_metadata:
+            usage["input_tokens"] += message.usage_metadata["input_tokens"]
+            usage["output_tokens"] += message.usage_metadata["output_tokens"]
+            usage["total_tokens"] += message.usage_metadata["total_tokens"]
+    return usage
 
 
 def _to_chat_message(message: BaseMessage) -> ChatMessage | None:

@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from financial_agent.api.app import create_app
-from tests.eval.common import OUT_DIR, ROOT, has_openai_key, load_jsonl
+from tests.eval.common import OUT_DIR, ROOT, has_openai_key, load_jsonl, pct, record_metric
 
 pytestmark = pytest.mark.eval
 
@@ -76,6 +76,7 @@ def test_numbers_are_parsed_in_both_formats() -> None:
 
 def test_answers_contain_expected_result(results: list[dict[str, Any]]) -> None:
     misses = [r["question"] for r in results if not has_result(r)]
+    record_metric("sc004_result", pct(1 - len(misses) / len(results)), not misses)
     assert not misses, (
         f"{len(misses)} de {len(results)} respostas sem o resultado esperado (SC-004): {misses}; "
         f"detalhes em {FAILURES.relative_to(ROOT)}"
@@ -84,4 +85,5 @@ def test_answers_contain_expected_result(results: list[dict[str, Any]]) -> None:
 
 def test_answers_cite_calculation_source(results: list[dict[str, Any]]) -> None:
     misses = [r["question"] for r in results if not has_calculation_source(r)]
+    record_metric("sc004_source", pct(1 - len(misses) / len(results)), not misses)
     assert not misses, f"respostas sem fonte `calculation` (FR-007): {misses}"

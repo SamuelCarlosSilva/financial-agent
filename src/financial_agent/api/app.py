@@ -36,6 +36,9 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
     vectorstore = get_vectorstore(settings, get_embeddings(settings))
     # Cliente HTTP compartilhado pelas ferramentas (cotação de moedas).
     http_client = httpx.AsyncClient(timeout=settings.FX_TIMEOUT_SECONDS)
+    # Cliente da OpenAI preso a este lifespan. Sem ele, o `ChatOpenAI` usa um cliente global que
+    # fica ligado ao primeiro event loop e falha com "Event loop is closed" num app recriado.
+    openai_client = httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SECONDS)
     try:
         checkpointer = await db.setup_checkpointer(pool)
         await db.setup_thread_metadata(pool)
@@ -45,12 +48,14 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
             temperature=0,
             timeout=settings.LLM_TIMEOUT_SECONDS,
             api_key=settings.OPENAI_API_KEY,
+            http_async_client=openai_client,
         )
         guardrail_llm = ChatOpenAI(
             model=settings.GUARDRAIL_MODEL,
             temperature=0,
             timeout=settings.LLM_TIMEOUT_SECONDS,
             api_key=settings.OPENAI_API_KEY,
+            http_async_client=openai_client,
         )
         tools = get_tools(settings, vectorstore, http_client)
         # Compilado uma única vez; o estado da conversa vive só no checkpointer.
@@ -64,6 +69,7 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.ping = ping
         yield
     finally:
+        await openai_client.aclose()
         await http_client.aclose()
         await close_vectorstore(vectorstore)
         await pool.close()

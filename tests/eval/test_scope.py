@@ -8,7 +8,6 @@ reingerido antes da execução (as mensagens mistas têm a parte financeira resp
 
 import asyncio
 import json
-import statistics
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -20,7 +19,17 @@ from fastapi.testclient import TestClient
 
 from financial_agent.api.app import create_app
 from financial_agent.graph.prompts import CLARIFY_MESSAGE, OUT_OF_SCOPE_MESSAGE
-from tests.eval.common import OUT_DIR, ROOT, has_openai_key, ingest_docs, load_jsonl
+from tests.eval.common import (
+    OUT_DIR,
+    ROOT,
+    has_openai_key,
+    ingest_docs,
+    load_jsonl,
+    p95,
+    pct,
+    record_metric,
+    secs,
+)
 from tests.eval.judge import Verdict, judge
 
 pytestmark = pytest.mark.eval
@@ -37,12 +46,6 @@ def refused(row: dict[str, Any]) -> bool:
         and row["answer"] == OUT_OF_SCOPE_MESSAGE
         and row["sources"] == []
     )
-
-
-def p95(values: list[float]) -> float:
-    if len(values) < 2:
-        return max(values, default=0.0)
-    return statistics.quantiles(values, n=100, method="inclusive")[94]
 
 
 def _failed(row: dict[str, Any]) -> bool:
@@ -123,6 +126,7 @@ def test_out_of_scope_messages_are_refused(results: list[dict[str, Any]]) -> Non
     rows = by_expected(results, "out_of_scope")
     misses = [r["message"] for r in rows if not refused(r)]
     rate = 1 - len(misses) / len(rows)
+    record_metric("sc001_refusal", pct(rate), rate >= 0.95)
     assert rate >= 0.95, f"recusa {rate:.0%} < 95% (SC-001); não recusadas: {misses}"
 
 
@@ -130,12 +134,14 @@ def test_financial_messages_are_not_refused(results: list[dict[str, Any]]) -> No
     rows = by_expected(results, "in_scope")
     misses = [r["message"] for r in rows if refused(r)]
     rate = len(misses) / len(rows)
+    record_metric("sc001_false_refusal", pct(rate), rate <= 0.05)
     assert rate <= 0.05, f"falsa recusa {rate:.0%} > 5% (SC-001); recusadas: {misses}"
 
 
 def test_refusals_are_fast(results: list[dict[str, Any]]) -> None:
     latencies = [r["latency"] for r in results if refused(r)]
     assert latencies, "nenhuma recusa medida"
+    record_metric("sc006_refusal_p95", secs(p95(latencies)), p95(latencies) <= 3.0)
     assert p95(latencies) <= 3.0, f"p95 das recusas {p95(latencies):.2f}s > 3s (SC-006)"
 
 
@@ -160,4 +166,5 @@ def test_mixed_messages_answer_financial_part_with_notice(results: list[dict[str
 def test_answers_are_in_pt_br(results: list[dict[str, Any]]) -> None:
     judged = [r for r in results if r["verdict"] is not None]
     misses = [r["message"] for r in judged if r["verdict"].language != "pt-BR"]
+    record_metric("fr014_scope", pct(1 - len(misses) / len(judged)), not misses)
     assert not misses, f"respostas fora de pt-BR (FR-014): {misses}"
