@@ -46,8 +46,20 @@ class ScopeDecision(BaseModel):
     reason: str = Field(max_length=200)
 
 
+class AdviceCheck(BaseModel):
+    """Se a mensagem pede recomendação de investimento (classificação separada do escopo).
+
+    Fica fora de `ScopeDecision` de propósito: com o campo no mesmo schema, o classificador de
+    escopo passou a errar mensagens mistas e acompanhamentos.
+    """
+
+    advice_request: bool
+
+
 class GraphState(MessagesState):
     scope: ScopeDecision | None
+    # Pedido de recomendação no turno atual: a resposta sai com o aviso (nó add_advice_disclaimer).
+    advice_request: bool
     # Fontes do turno atual; a rota envia [] a cada turno para zerar o valor anterior.
     turn_sources: list[SourceCitation]
 

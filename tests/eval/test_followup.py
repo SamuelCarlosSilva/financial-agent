@@ -58,16 +58,26 @@ def last_turn_calls(messages: Sequence[BaseMessage]) -> list[dict[str, Any]]:
     ]
 
 
-def interpreted(case: dict[str, Any], calls: list[dict[str, Any]]) -> bool:
+def called(calls: list[dict[str, Any]], tool: str, args_contains: dict[str, Any]) -> bool:
     return any(
-        call["name"] == case["expected_tool"]
+        call["name"] == tool
         and all(
             contains(call["args"].get(arg, ""), piece)
-            for arg, pieces in case["expected_args_contains"].items()
+            for arg, pieces in args_contains.items()
             for piece in pieces
         )
         for call in calls
     )
+
+
+def interpreted(case: dict[str, Any], calls: list[dict[str, Any]]) -> bool:
+    """A chamada esperada e, em `also_expected`, as outras do mesmo turno (ex.: a cotação de novo
+    antes de converter, Princípio I)."""
+    expected = [
+        {"tool": case["expected_tool"], "args_contains": case["expected_args_contains"]},
+        *case.get("also_expected", []),
+    ]
+    return all(called(calls, e["tool"], e["args_contains"]) for e in expected)
 
 
 def leaked(case: dict[str, Any], calls: list[dict[str, Any]]) -> list[str]:

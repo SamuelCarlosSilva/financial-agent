@@ -9,7 +9,7 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.runnables import Runnable, RunnableLambda
 from langchain_core.tools import BaseTool
 
-from financial_agent.graph.state import ScopeDecision
+from financial_agent.graph.state import AdviceCheck, ScopeDecision
 
 
 class FakeToolChatModel(FakeMessagesListChatModel):
@@ -48,11 +48,21 @@ def fake_llm(*responses: BaseMessage) -> FakeToolChatModel:
 
 
 class FakeScopeModel(FakeToolChatModel):
-    """Classificador roteirizado: `with_structured_output` devolve (ou lança) cada decisão."""
+    """Classificador roteirizado: `with_structured_output` devolve (ou lança) cada decisão.
+
+    A checagem de recomendação (`AdviceCheck`) responde com `advice`, um valor por chamada
+    (`False` quando a lista acaba), e não entra em `calls`.
+    """
 
     decisions: list[ScopeDecision | Exception] = []
+    advice: list[bool] = []
 
     def with_structured_output(self, schema: Any, **kwargs: Any) -> Any:
+        if schema is AdviceCheck:
+            return RunnableLambda(
+                lambda _: AdviceCheck(advice_request=self.advice.pop(0) if self.advice else False)
+            )
+
         def classify(messages: list[BaseMessage]) -> ScopeDecision:
             self.calls.append(list(messages))
             decision = self.decisions.pop(0)
@@ -63,5 +73,7 @@ class FakeScopeModel(FakeToolChatModel):
         return RunnableLambda(classify)
 
 
-def fake_guardrail(*decisions: ScopeDecision | Exception) -> FakeScopeModel:
-    return FakeScopeModel(responses=[], calls=[], decisions=list(decisions))
+def fake_guardrail(
+    *decisions: ScopeDecision | Exception, advice: Sequence[bool] = ()
+) -> FakeScopeModel:
+    return FakeScopeModel(responses=[], calls=[], decisions=list(decisions), advice=list(advice))
