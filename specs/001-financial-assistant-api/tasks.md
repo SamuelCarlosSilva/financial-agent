@@ -317,3 +317,12 @@ Task: "T055 [US4] tests/unit/test_calculator.py"      →  "T056 [US4] tools/cal
 - Nenhuma tarefa pode introduzir estado de conversa em memória no processo (Princípio IV)
 - Os evals (`-m eval`) usam a OpenAI real e custam tokens. Eles não rodam por padrão no pytest
 - Commit depois de cada tarefa ou grupo lógico
+
+---
+
+## Phase 9: Convergence
+
+- [X] T071 CRITICAL: Enforce in code that a currency conversion uses a quote fetched in the current turn: when a turn calls `calculate` with an exchange rate but has no `get_currency_quote` call of its own (and the user did not supply the rate), make the agent fetch the quote again or replace the answer, so the `fx_quote` source always comes back in `sources` (quickstart scenario 7, see `checklists/quickstart-validation.md`); cover it with a unit test in `tests/unit/test_graph.py` and a follow-up case in `tests/eval/datasets/followup.jsonl` per Constitution I (contradicts)
+- [X] T072 Bring SC-002 to 100%: stop answers to questions without an answer in the knowledge base (e.g. "O que é o IGP-M e quem calcula?") from being built from a loosely related glossary chunk. Inspect the failing cases in `tests/eval/out/`, then tighten relevance in `src/financial_agent/tools/document_search.py` and/or the grounding check in `src/financial_agent/graph/nodes/grounding.py`, and rerun `test_grounding.py` until `sc002_supported` passes in consecutive runs per SC-002 (partial)
+- [X] T073 Make the advice disclaimer deterministic: have the guardrail in `src/financial_agent/graph/nodes/guardrail.py` flag recommendation requests in `ScopeDecision` (`src/financial_agent/graph/state.py`) and have the graph append the "not financial advice" notice in code instead of relying on prompt rule 6; add unit tests and confirm `test_advice.py` stays at 100% across runs (e.g. "Compro ou vendo dólar agora?") per spec Assumptions: recommendation disclaimer (partial)
+- [X] T074 Register `ScopeDecision`, `DocumentSource`, `FxQuoteSource` and `CalculationSource` as allowed types in the checkpointer serializer (`allowed_msgpack_modules`) in `src/financial_agent/api/db.py`, so reading checkpoints no longer warns "Deserializing unregistered type" and keeps working in future LangGraph versions; add a test that a stored thread is read back without the warning per FR-008 (partial)

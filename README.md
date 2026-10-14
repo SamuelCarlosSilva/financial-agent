@@ -10,7 +10,10 @@ diz que não encontrou em vez de inventar.
 > **Status:** as cinco histórias estão prontas: busca em documentos (US1), guardrail de escopo
 > (US2), cotação de moedas (US3), calculadora (US4) e histórico de conversas (US5). O polimento
 > (Fase 8) trouxe o relatório consolidado das avaliações, os evals de acompanhamento, latência e
-> recomendação e a validação manual do quickstart. Pendências conhecidas no [roadmap](#roadmap).
+> recomendação e a validação manual do quickstart. A convergência (Fase 9) fechou as pendências
+> dessa validação: trava de cotação de turno anterior, verificação de fundamentação, aviso de
+> recomendação garantido no código e tipos registrados no checkpointer. Pendências conhecidas no
+> [roadmap](#roadmap).
 
 ## Sumário
 
@@ -53,17 +56,24 @@ flowchart LR
     guardrail -- "ambiguous" --> clarify
     refuse --> END((END))
     clarify --> END
-    agent -- "chamou ferramenta" --> tools
+    agent -- "chamou ferramenta" --> quote_guard
+    quote_guard -- "cotação válida" --> tools
+    quote_guard -- "cotação de turno anterior" --> agent
     tools --> agent
     agent -- "resposta final" --> collect_sources
     collect_sources --> enforce_grounding
-    enforce_grounding --> END
+    enforce_grounding --> verify_grounding
+    verify_grounding --> add_advice_disclaimer
+    add_advice_disclaimer --> END
 ```
 
 - **`guardrail`**: classificador (structured output, `GUARDRAIL_MODEL`) que roda antes de
   qualquer ferramenta. Recebe a mensagem atual e as 2 últimas trocas da conversa, para que
   acompanhamentos como "E o euro?" não sejam recusados, e trata o texto do usuário como dado,
   nunca como instrução. Se o classificador falhar, a mensagem é tratada como fora de escopo.
+  Em paralelo, uma segunda chamada ao mesmo modelo marca os pedidos de recomendação de
+  investimento (`advice_request`). Ela é separada da classificação de escopo porque, no mesmo
+  schema, mudava a classificação de mensagens mistas.
 - **`refuse`** / **`clarify`**: devolvem uma mensagem fixa (recusa padrão ou pedido de
   esclarecimento), sem chamar o LLM nem ferramentas.
 - **`agent`**: LLM (`gpt-4o-mini` por padrão) com as ferramentas vinculadas e um *system prompt*
@@ -72,6 +82,11 @@ flowchart LR
   resultados de ferramentas, para que cada resposta traga as próprias fontes. O laço
   agent ⇄ tools tem no máximo 4 rodadas por turno (`MAX_TOOL_ROUNDS`); na última, as ferramentas
   são desligadas (`tool_choice="none"`) e o agente responde com o que já coletou.
+- **`quote_guard`**: trava de cotação. Se um `calculate` usa o valor de compra ou venda de uma
+  cotação de um turno anterior, sem consultá-la de novo no turno e sem o usuário ter escrito esse
+  valor na pergunta, a rodada não é executada: o agente recebe o erro
+  `COTACAO_DE_TURNO_ANTERIOR`, consulta a cotação e refaz o cálculo. Assim a conversão sempre
+  sai com a fonte `fx_quote`.
 - **`tools`**: executa as ferramentas pedidas pelo agente:
   - `search_financial_documents`: busca por similaridade no pgvector, descartando trechos abaixo
     de `RAG_MIN_SCORE`;
@@ -88,10 +103,20 @@ flowchart LR
 - **`enforce_grounding`**: trava de fundamentação. Se o agente buscou documentos, ou citou um
   trecho `[n]`, e terminou o turno sem nenhuma fonte, a resposta é substituída por
   *"Não encontrei essa informação nas fontes disponíveis."*
+- **`verify_grounding`**: verificação de fundamentação. Quando a resposta cita trechos de
+  documentos, o `GUARDRAIL_MODEL` confere cada afirmação contra os resultados das ferramentas do
+  turno. Se alguma não estiver nos trechos (o agente respondeu de cabeça citando um trecho
+  parecido), a resposta vira *"Não encontrei essa informação nas fontes disponíveis."*, sem
+  fontes. Se a verificação falhar, a resposta segue como está.
+- **`add_advice_disclaimer`**: se o guardrail marcou um pedido de recomendação e a resposta saiu
+  sem o aviso, acrescenta *"Esta resposta é informativa e não constitui recomendação de
+  investimento."*
 
 **API stateless, estado no `thread_id`.** A aplicação não guarda conversa em memória: o histórico
 de cada conversa fica no Postgres, via checkpointer do LangGraph, indexado pelo `thread_id`. Isso
-permite reiniciar ou escalar a API sem perder contexto.
+permite reiniciar ou escalar a API sem perder contexto. O serializador do checkpointer só aceita,
+além dos tipos padrão do LangGraph, os modelos do estado registrados em `CHECKPOINT_TYPES`
+(`api/db.py`).
 
 Princípios do projeto (detalhados na [constituição](.specify/memory/constitution.md)):
 
@@ -357,6 +382,10 @@ suas métricas em `tests/eval/out/metrics/`; uma métrica que não foi gravada a
 "não medido" e conta como falha. Com `--no-run`, só imprime a tabela da última execução. O SC-007
 (histórico após reinício) é coberto pelo teste de integração `test_thread_memory.py`.
 
+**Testes manuais** ([`docs/roteiro-testes-manuais.md`](docs/roteiro-testes-manuais.md)): roteiro
+com comandos prontos para validar a API à mão (documentos, escopo, cotação, cálculo, conversas,
+validação, autenticação, resiliência, logs e manutenção) e uma folha para registrar os resultados.
+
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em cada push na `main` e em cada
 pull request roda lint e tipos, testes unitários e de contrato, testes de integração e o build da
 imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
@@ -375,21 +404,17 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 
 ## Roadmap
 
-Pendências encontradas na validação da Fase 8 (detalhes em
-[`quickstart-validation.md`](specs/001-financial-assistant-api/checklists/quickstart-validation.md)):
+Pendências conhecidas depois da Fase 9:
 
-- **Conversão com cotação de um turno anterior:** em "Quanto são 500 disso em reais?", o agente
-  às vezes usa o bid que aparece na resposta anterior, em vez de consultar a cotação no turno. O
-  cálculo sai com fonte, mas a cotação usada não aparece em `sources`.
 - **Falha do guardrail vira recusa:** se a chamada ao classificador falha (por exemplo, por
   *timeout* da OpenAI), a mensagem é tratada como fora de escopo, por decisão de projeto. Para o
   usuário, uma pergunta financeira legítima aparece como recusada.
-- **Fundamentação e aviso instáveis:** no último relatório, 15 de 16 metas foram atingidas. O
-  SC-002 (100% das afirmações com fonte) oscila em torno de 97%, também na `main`, e o aviso de
-  recomendação oscila entre 90% e 100%.
-- **Tipos no checkpoint:** o LangGraph avisa que vai bloquear a leitura de tipos não registrados
-  (`ScopeDecision`, `DocumentSource`, `FxQuoteSource`). É preciso registrá-los em
-  `allowed_msgpack_modules`.
+- **Resolução de "disso" em conversões:** em "Quanto são 500 disso em reais?" depois de "E o
+  euro?", o agente às vezes consulta a moeda errada (dólar). A trava de cotação garante que a
+  cotação usada é do próprio turno e vem com fonte, mas não escolhe a moeda.
+- **Expressões de taxa equivalente:** o modelo às vezes monta `(1 + 0.01) ** 12 - 1 * 100` sem os
+  parênteses certos, e o SC-004 cai para 95,5% nessa rodada. A calculadora está certa; o erro é
+  da expressão escrita pelo LLM.
 
 ## Desenvolvimento
 
