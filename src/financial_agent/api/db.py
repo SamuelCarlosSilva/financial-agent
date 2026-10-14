@@ -4,11 +4,23 @@ from importlib.resources import files
 from typing import Any
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from psycopg import AsyncConnection
 from psycopg.rows import DictRow, dict_row
 from psycopg_pool import AsyncConnectionPool
 
+from financial_agent.graph.state import (
+    CalculationSource,
+    DocumentSource,
+    FxQuoteSource,
+    ScopeDecision,
+)
+
 Pool = AsyncConnectionPool[AsyncConnection[DictRow]]
+
+# Tipos do projeto gravados no estado do grafo. Mensagens, `Decimal` e `datetime` já estão na
+# lista segura do LangGraph; qualquer outro tipo é bloqueado na leitura do checkpoint.
+CHECKPOINT_TYPES = (ScopeDecision, DocumentSource, FxQuoteSource, CalculationSource)
 
 
 async def open_pool(database_url: str, max_size: int = 20) -> Pool:
@@ -26,8 +38,13 @@ async def open_pool(database_url: str, max_size: int = 20) -> Pool:
     return pool
 
 
+def checkpoint_serializer() -> JsonPlusSerializer:
+    """Serializador com allowlist explícita: sem ela, o LangGraph aceita qualquer tipo com aviso."""
+    return JsonPlusSerializer(allowed_msgpack_modules=CHECKPOINT_TYPES)
+
+
 async def setup_checkpointer(pool: Pool) -> AsyncPostgresSaver:
-    checkpointer = AsyncPostgresSaver(pool)
+    checkpointer = AsyncPostgresSaver(pool, serde=checkpoint_serializer())
     await checkpointer.setup()
     return checkpointer
 

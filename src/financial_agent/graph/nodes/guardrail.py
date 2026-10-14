@@ -1,5 +1,6 @@
 """Guardrail de escopo: classifica a mensagem antes de qualquer ferramenta (Princípio II)."""
 
+import asyncio
 import re
 from collections.abc import Sequence
 from typing import Any, Literal, Protocol
@@ -7,8 +8,8 @@ from typing import Any, Literal, Protocol
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
-from financial_agent.graph.prompts import GUARDRAIL_SYSTEM_PROMPT
-from financial_agent.graph.state import GraphState, ScopeDecision
+from financial_agent.graph.prompts import ADVICE_CHECK_PROMPT, GUARDRAIL_SYSTEM_PROMPT
+from financial_agent.graph.state import AdviceCheck, GraphState, ScopeDecision
 from financial_agent.logging import get_logger, truncate
 
 log = get_logger(__name__)
@@ -62,12 +63,10 @@ def classifier_input(messages: Sequence[BaseMessage]) -> str:
 
 def make_guardrail_node(llm: BaseChatModel) -> GuardrailNode:
     classifier = llm.with_structured_output(ScopeDecision)
+    advice_classifier = llm.with_structured_output(AdviceCheck)
 
-    async def guardrail(state: GraphState) -> dict[str, Any]:
-        prompt = [
-            SystemMessage(GUARDRAIL_SYSTEM_PROMPT),
-            HumanMessage(classifier_input(state["messages"])),
-        ]
+    async def classify(user_input: str) -> ScopeDecision:
+        prompt = [SystemMessage(GUARDRAIL_SYSTEM_PROMPT), HumanMessage(user_input)]
         try:
             decision = await classifier.ainvoke(prompt)
             if not isinstance(decision, ScopeDecision):
@@ -75,8 +74,28 @@ def make_guardrail_node(llm: BaseChatModel) -> GuardrailNode:
         except Exception as exc:
             # Na dúvida, recusa: nenhuma ferramenta roda sem uma classificação válida.
             log.warning("guardrail_error", error=type(exc).__name__)
-            decision = GUARDRAIL_ERROR
-        return {"scope": decision, "turn_sources": []}
+            return GUARDRAIL_ERROR
+        return decision
+
+    async def is_advice_request(user_input: str) -> bool:
+        prompt = [SystemMessage(ADVICE_CHECK_PROMPT), HumanMessage(user_input)]
+        try:
+            check = await advice_classifier.ainvoke(prompt)
+            if not isinstance(check, AdviceCheck):
+                check = AdviceCheck.model_validate(check)
+        except Exception as exc:
+            # Sem a marcação, o aviso ainda vem da regra 6 do prompt do agente.
+            log.warning("advice_check_error", error=type(exc).__name__)
+            return False
+        return check.advice_request
+
+    async def guardrail(state: GraphState) -> dict[str, Any]:
+        user_input = classifier_input(state["messages"])
+        # Em paralelo: a checagem de recomendação não aumenta a latência do guardrail.
+        decision, advice_request = await asyncio.gather(
+            classify(user_input), is_advice_request(user_input)
+        )
+        return {"scope": decision, "advice_request": advice_request, "turn_sources": []}
 
     return guardrail
 

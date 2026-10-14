@@ -35,6 +35,7 @@ como `ChatMessage`.
 |---|---|---|
 | `messages` | `list[BaseMessage]` (reducer `add_messages`) | Histórico completo, incluindo tool calls. |
 | `scope` | `ScopeDecision \| None` | Decisão do guardrail no turno atual. |
+| `advice_request` | `bool` | Pedido de recomendação de investimento no turno atual, marcado pelo guardrail numa chamada separada (`AdviceCheck`). A resposta sai com o aviso `ADVICE_DISCLAIMER`, acrescentado pelo nó `add_advice_disclaimer` se o agente o omitir. |
 | `turn_sources` | `list[SourceCitation]` (reset a cada turno) | Fontes coletadas dos artefatos das ferramentas no turno. |
 
 ## 4. ScopeDecision (Decisão de Escopo)

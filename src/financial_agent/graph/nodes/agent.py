@@ -74,7 +74,7 @@ def current_turn(messages: Sequence[BaseMessage]) -> Sequence[BaseMessage]:
     return messages
 
 
-def _to_sources(artifact: Any) -> list[SourceCitation]:
+def to_sources(artifact: Any) -> list[SourceCitation]:
     if artifact is None:
         return []
     items = artifact if isinstance(artifact, list) else [artifact]
@@ -107,7 +107,7 @@ def collect_sources(state: GraphState) -> dict[str, Any]:
             continue
         match = _FIRST_MARKER.match(message.text)
         first = int(match.group(1)) if match else None
-        for offset, source in enumerate(_to_sources(message.artifact)):
+        for offset, source in enumerate(to_sources(message.artifact)):
             if source.type == "document" and (first is None or first + offset not in cited):
                 continue
             sources.append(source)

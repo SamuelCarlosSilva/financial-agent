@@ -17,6 +17,7 @@ from financial_agent.api.threads import InMemoryThreadStore, PostgresThreadStore
 from financial_agent.config import get_settings
 from financial_agent.graph.builder import build_graph
 from financial_agent.graph.nodes.guardrail import make_guardrail_node
+from financial_agent.graph.nodes.verify import make_grounding_verifier
 from financial_agent.logging import configure_logging, request_id_var
 from financial_agent.rag.vectorstore import close_vectorstore, get_embeddings, get_vectorstore
 from financial_agent.tools import get_tools
@@ -60,7 +61,11 @@ async def _production_lifespan(app: FastAPI) -> AsyncIterator[None]:
         tools = get_tools(settings, vectorstore, http_client)
         # Compilado uma única vez; o estado da conversa vive só no checkpointer.
         app.state.graph = build_graph(
-            checkpointer, llm, tools, guardrail=make_guardrail_node(guardrail_llm)
+            checkpointer,
+            llm,
+            tools,
+            guardrail=make_guardrail_node(guardrail_llm),
+            verifier=make_grounding_verifier(guardrail_llm),
         )
 
         async def ping() -> bool:
