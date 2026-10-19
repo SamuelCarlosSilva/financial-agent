@@ -11,6 +11,7 @@ from financial_agent.graph.nodes.verify import GroundingCheck, make_grounding_ve
 from financial_agent.graph.prompts import NOT_FOUND_MESSAGE
 from financial_agent.tools import get_tools
 from tests.fakes import fake_llm
+from tests.unit.test_chat_log import usage
 from tests.unit.test_document_search import FakeVectorStore, doc, search_call, settings
 
 
@@ -52,13 +53,17 @@ def search_then(answer: str) -> tuple[AIMessage, AIMessage]:
 
 async def test_unsupported_cited_answer_is_replaced_without_sources() -> None:
     checker = FakeChecker(GroundingCheck(supported=False, unsupported=["O IGP-M é da FGV."]))
+    search, answer = search_then("O IGP-M é calculado pela FGV [1].")
+    answer.usage_metadata = usage(120, 15)
 
-    state = await run(checker, *search_then("O IGP-M é calculado pela FGV [1]."))
+    state = await run(checker, search, answer)
 
-    answer = state["messages"][-1]
-    assert answer.content == NOT_FOUND_MESSAGE
+    replaced = state["messages"][-1]
+    assert replaced.content == NOT_FOUND_MESSAGE
+    # O uso de tokens da resposta descartada continua no log do turno.
+    assert replaced.usage_metadata == usage(120, 15)
     assert state["turn_sources"] == []
-    assert answer.additional_kwargs["sources"] == []
+    assert replaced.additional_kwargs["sources"] == []
     # O verificador recebe a pergunta, o trecho recuperado e a resposta.
     prompt = checker.calls[0][1].content
     assert "O que é o IGP-M?" in prompt

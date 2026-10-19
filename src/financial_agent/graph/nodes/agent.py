@@ -17,6 +17,9 @@ from pydantic import BaseModel, TypeAdapter
 
 from financial_agent.graph.prompts import AGENT_SYSTEM_PROMPT
 from financial_agent.graph.state import GraphState, SourceCitation, history_metadata
+from financial_agent.logging import get_logger
+
+log = get_logger(__name__)
 
 _source_adapter: TypeAdapter[SourceCitation] = TypeAdapter(SourceCitation)
 
@@ -37,6 +40,7 @@ class AgentNode(Protocol):
 def make_agent_node(llm: BaseChatModel, tools: Sequence[BaseTool]) -> AgentNode:
     model = llm.bind_tools(list(tools)) if tools else llm
     final_model = llm.bind_tools(list(tools), tool_choice="none") if tools else llm
+    required_model = llm.bind_tools(list(tools), tool_choice="required") if tools else None
 
     async def agent(state: GraphState) -> dict[str, Any]:
         messages = [SystemMessage(AGENT_SYSTEM_PROMPT), *agent_view(state["messages"])]
@@ -45,6 +49,17 @@ def make_agent_node(llm: BaseChatModel, tools: Sequence[BaseTool]) -> AgentNode:
         )
         chosen = final_model if rounds >= MAX_TOOL_ROUNDS else model
         response = await chosen.ainvoke(messages)
+        # Resposta que cita [n] sem nenhuma ferramenta no turno foi copiada do histórico e seria
+        # trocada por `enforce_grounding`. Uma nova chamada, com ferramenta obrigatória, refaz a
+        # busca neste turno para a resposta sair com as fontes dele.
+        if (
+            required_model is not None
+            and rounds == 0
+            and not response.tool_calls
+            and cited_markers(response.text)
+        ):
+            log.warning("agent_forced_tool_call")
+            response = await required_model.ainvoke(messages)
         return {"messages": [response]}
 
     return agent

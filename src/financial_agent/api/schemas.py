@@ -12,10 +12,14 @@ ScopeLabel = Literal["in_scope", "out_of_scope", "ambiguous"]
 
 
 class ChatRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # Sem exemplo, o Swagger preenche `thread_id` com um UUID fixo e todos os testes feitos pelo
+    # /docs caem na mesma thread. O exemplo sem `thread_id` abre uma conversa nova.
+    model_config = ConfigDict(
+        extra="forbid", json_schema_extra={"examples": [{"message": "O que é come-cotas?"}]}
+    )
 
     message: str = Field(min_length=1, max_length=4000)
-    thread_id: UUID | None = None
+    thread_id: UUID | None = Field(default=None, examples=[None])
 
     @field_validator("message")
     @classmethod

@@ -63,6 +63,14 @@ def test_chat_new_thread_matches_contract(app_client: TestClient, spec: dict[str
     assert response.headers["X-Request-ID"]
 
 
+def test_chat_request_example_starts_a_new_thread(app_client: TestClient) -> None:
+    # Sem isso, o Swagger manda o mesmo UUID de exemplo em todo teste feito pelo /docs.
+    schema = app_client.get("/openapi.json").json()["components"]["schemas"]["ChatRequest"]
+
+    assert schema["examples"] == [{"message": "O que é come-cotas?"}]
+    assert schema["properties"]["thread_id"]["examples"] == [None]
+
+
 def test_chat_keeps_given_thread_id(app_client: TestClient, spec: dict[str, Any]) -> None:
     thread_id = "3f6c2a3e-8a1b-4a53-9d7a-2f1d0c1b9e10"
 
