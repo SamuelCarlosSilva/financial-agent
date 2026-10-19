@@ -84,7 +84,10 @@ def make_grounding_verifier(llm: BaseChatModel) -> VerifierNode:
         # Mesmo id: o reducer `add_messages` substitui a resposta em vez de acrescentar outra.
         # Sem fontes: a mensagem padrão não se apoia nos trechos que foram descartados.
         replacement = AIMessage(
-            content=NOT_FOUND_MESSAGE, id=final.id, additional_kwargs=history_metadata()
+            content=NOT_FOUND_MESSAGE,
+            id=final.id,
+            additional_kwargs=history_metadata(),
+            usage_metadata=final.usage_metadata,
         )
         return {"messages": [replacement], "turn_sources": []}
 
