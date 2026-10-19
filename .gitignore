@@ -16,6 +16,9 @@ dist/
 .coverage
 coverage/
 
+# Logs locais (ex.: api.log dos testes manuais)
+*.log
+
 # Saídas dos evals
 tests/eval/out/
 
