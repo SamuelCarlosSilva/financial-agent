@@ -17,6 +17,7 @@ from financial_agent.graph.state import DocumentSource
 from financial_agent.tools import get_tools
 from financial_agent.tools.document_search import NO_RESULTS, make_search_tool
 from tests.fakes import fake_llm
+from tests.unit.test_chat_log import usage
 
 
 class FakeVectorStore:
@@ -296,8 +297,40 @@ async def test_turn_without_search_is_not_touched() -> None:
 
 
 async def test_citation_without_search_in_the_turn_is_replaced() -> None:
-    # Acompanhamento respondido com o trecho de um turno anterior: o [1] não teria fonte.
-    _, state = await run_graph(FakeVectorStore([]), AIMessage("É cobrado em maio e novembro [1]."))
+    # Acompanhamento respondido com o trecho de um turno anterior: o [1] não teria fonte. A nova
+    # chamada com ferramenta obrigatória também volta sem busca, então a trava troca a resposta.
+    copied = AIMessage("É cobrado em maio e novembro [1].", usage_metadata=usage(80, 10))
+    llm, state = await run_graph(FakeVectorStore([]), copied, copied)
 
+    assert llm.tool_choices == [None, "required"]
     assert state["messages"][-1].content == NOT_FOUND_MESSAGE
+    assert state["messages"][-1].usage_metadata == usage(80, 10)
     assert state["turn_sources"] == []
+
+
+async def test_citation_without_search_forces_a_search_in_the_turn() -> None:
+    store = FakeVectorStore([(doc("Semestral.", "come-cotas.md", "Come-cotas"), 0.9)])
+
+    llm, state = await run_graph(
+        store,
+        AIMessage("O come-cotas é semestral [1]."),
+        AIMessage("", tool_calls=[search_call("come-cotas", "s1")]),
+        AIMessage("O come-cotas é semestral [1]."),
+    )
+
+    assert llm.tool_choices == [None, "required", None]
+    assert state["messages"][-1].content == "O come-cotas é semestral [1]."
+    assert [s.source for s in state["turn_sources"]] == ["come-cotas.md"]
+    # A resposta copiada foi descartada antes de entrar no estado.
+    assert [type(m).__name__ for m in state["messages"]] == [
+        "HumanMessage",
+        "AIMessage",
+        "ToolMessage",
+        "AIMessage",
+    ]
+
+
+async def test_answer_without_citation_does_not_force_a_search() -> None:
+    llm, _ = await run_graph(FakeVectorStore([]), AIMessage("Olá! Como posso ajudar?"))
+
+    assert llm.tool_choices == [None]
