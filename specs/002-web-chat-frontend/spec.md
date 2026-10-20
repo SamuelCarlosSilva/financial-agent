@@ -44,9 +44,8 @@ devolvida pela API.
 
 ### User Story 2 - Entender recusas e avisos do assistente (Priority: P1)
 
-Quando a pergunta está fora de finanças, é ambígua, não tem resposta nas fontes, pede
-recomendação de investimento ou mistura um tema financeiro com outro, o assistente devolve uma
-mensagem padronizada. A interface apresenta cada caso como um aviso próprio, com título e ícone,
+Quando a pergunta está fora de finanças, é ambígua, não tem resposta nas fontes ou pede
+recomendação de investimento, o assistente devolve uma mensagem padronizada. A interface apresenta cada caso como um aviso próprio, com título e ícone,
 em tom neutro ou de atenção, nunca como erro técnico, e mostra o texto exatamente como veio do
 assistente.
 
@@ -180,7 +179,8 @@ cotação (com o par) e cálculo (com a expressão).
   milhar) e com algarismos de largura fixa.
 - **FR-008**: A interface DEVE apresentar de forma distinta cada classificação da resposta:
   dentro do escopo, fora do escopo (recusa), ambígua (esclarecimento), informação não encontrada,
-  aviso de não recomendação e resposta parcial a pergunta mista.
+  e aviso de não recomendação. Uma pergunta mista é exibida como resposta comum, com o aviso
+  escrito pelo próprio assistente no texto.
 - **FR-009**: A interface NÃO DEVE reescrever, resumir ou complementar o texto devolvido pelo
   assistente; as mensagens padronizadas aparecem exatamente como recebidas.
 - **FR-010**: A interface DEVE manter, por navegador, a lista de conversas iniciadas, com título
@@ -245,7 +245,7 @@ cotação (com o par) e cálculo (com a expressão).
 - Uso de demonstração/vitrine técnica com um operador único: não há login de usuário final; o
   acesso ao serviço usa uma credencial configurada no servidor da interface.
 - O serviço responde a cada pergunta de uma vez, sem envio progressivo; o resumo de passos é
-  reconstruído a partir das fontes (US5), sem alterações no serviço de conversa.
+  reconstruído a partir das fontes (US5).
 - O serviço não lista conversas; a lista é local a cada navegador e não sincroniza entre
   dispositivos.
 - A retenção de 30 dias é a configuração atual do serviço.
@@ -255,5 +255,8 @@ cotação (com o par) e cálculo (com a expressão).
 - A interface ficará em uma pasta própria na raiz do repositório, sem reorganizar o serviço
   existente; estrutura de pastas, tecnologia, execução local e integração ao pipeline são
   definidas no `/speckit-plan`.
-- Pode ser necessário um ajuste mínimo no serviço para permitir o acesso intermediado; isso é
-  avaliado no plano.
+- A única mudança no serviço é aditiva: cada fonte de documento passa a informar o número `[n]`
+  com que foi citada, para ligar o marcador ao cartão (FR-005). O acesso intermediado não exige
+  mudança no serviço.
+- A API não sinaliza perguntas mistas (parte financeira + parte fora do escopo): um aviso
+  dedicado para esse caso depende de um sinal explícito na API e fica para uma feature futura.
