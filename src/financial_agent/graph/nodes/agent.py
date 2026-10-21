@@ -109,7 +109,8 @@ def collect_sources(state: GraphState) -> dict[str, Any]:
     """Junta em `turn_sources` os artefatos dos `ToolMessage`s do turno atual.
 
     Trechos de documento só entram se a resposta final citar o número deles: a busca pode
-    trazer trechos parecidos que não respondem à pergunta, e esses não são fontes. As fontes e o
+    trazer trechos parecidos que não respondem à pergunta, e esses não são fontes. Cada trecho que
+    entra leva em `marker` o número com que foi citado. As fontes e o
     horário também vão para a resposta final, que é o que o histórico da thread expõe.
     """
     turn = current_turn(state["messages"])
@@ -123,8 +124,11 @@ def collect_sources(state: GraphState) -> dict[str, Any]:
         match = _FIRST_MARKER.match(message.text)
         first = int(match.group(1)) if match else None
         for offset, source in enumerate(to_sources(message.artifact)):
-            if source.type == "document" and (first is None or first + offset not in cited):
-                continue
+            if source.type == "document":
+                if first is None or first + offset not in cited:
+                    continue
+                # O número citado vai junto, para o cliente ligar o [n] do texto à fonte.
+                source = source.model_copy(update={"marker": first + offset})
             sources.append(source)
 
     update: dict[str, Any] = {"turn_sources": sources}

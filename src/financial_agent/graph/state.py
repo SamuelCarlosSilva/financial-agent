@@ -17,6 +17,8 @@ class DocumentSource(BaseModel):
     page: int | None = None
     snippet: str = Field(max_length=300)
     score: float
+    # Número [n] com que o trecho foi citado na resposta. Ausente em fontes salvas antes do campo.
+    marker: int | None = Field(default=None, ge=1)
 
 
 class FxQuoteSource(BaseModel):
