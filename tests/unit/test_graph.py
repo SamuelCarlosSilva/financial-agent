@@ -14,7 +14,7 @@ from financial_agent.graph.builder import RECURSION_LIMIT, build_graph
 from financial_agent.graph.nodes.agent import MAX_TOOL_ROUNDS, collect_sources
 from financial_agent.graph.nodes.quote_guard import STALE_QUOTE
 from financial_agent.graph.prompts import AGENT_SYSTEM_PROMPT
-from financial_agent.graph.state import CalculationSource, FxQuoteSource
+from financial_agent.graph.state import CalculationSource, DocumentSource, FxQuoteSource
 from financial_agent.tools.calculator import make_calculator_tool
 from tests.fakes import fake_llm
 
@@ -100,6 +100,60 @@ def test_collect_sources_accepts_list_artifacts_and_ignores_previous_turns() -> 
     result = collect_sources(state)  # type: ignore[arg-type]
 
     assert [s.expression for s in result["turn_sources"]] == ["2"]
+
+
+def _document(document_id: str) -> DocumentSource:
+    return DocumentSource(
+        document_id=document_id, title=document_id, source="doc.pdf", snippet="...", score=0.8
+    )
+
+
+def test_collect_sources_sets_marker_on_cited_documents() -> None:
+    search = ToolMessage(
+        "[3] Doc A (doc.pdf)\n...\n\n[4] Doc B (doc.pdf)\n...\n\n[5] Doc C (doc.pdf)\n...",
+        tool_call_id="s1",
+        artifact=[_document("a"), _document("b"), _document("c")],
+    )
+    quote = FxQuoteSource(
+        pair="USD-BRL",
+        bid=Decimal("5.1"),
+        ask=Decimal("5.2"),
+        quoted_at=datetime(2026, 10, 20, tzinfo=UTC),
+        provider="awesomeapi",
+    )
+    fx = ToolMessage("USD-BRL", tool_call_id="q1", artifact=quote)
+    calc = ToolMessage(
+        "1 + 1 = 2", tool_call_id="c1", artifact=CalculationSource(expression="1 + 1", result=2)
+    )
+    state = {
+        "messages": [HumanMessage("pergunta"), search, fx, calc, AIMessage("A [3] e C [5].")],
+        "scope": None,
+        "turn_sources": [],
+    }
+
+    sources = collect_sources(state)["turn_sources"]  # type: ignore[arg-type]
+
+    documents = [s for s in sources if isinstance(s, DocumentSource)]
+    assert [(d.document_id, d.marker) for d in documents] == [("a", 3), ("c", 5)]
+    assert [s.type for s in sources if not isinstance(s, DocumentSource)] == [
+        "fx_quote",
+        "calculation",
+    ]
+    assert all("marker" not in type(s).model_fields for s in sources if s.type != "document")
+
+
+def test_document_source_without_marker_still_validates() -> None:
+    # Fontes salvas no histórico antes do campo `marker` existir.
+    stored = {
+        "type": "document",
+        "document_id": "a",
+        "title": "A",
+        "source": "doc.pdf",
+        "snippet": "...",
+        "score": 0.8,
+    }
+
+    assert DocumentSource.model_validate(stored).marker is None
 
 
 async def test_tool_rounds_are_capped_and_last_call_has_tools_disabled() -> None:
