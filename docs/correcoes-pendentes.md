@@ -68,3 +68,46 @@ thread nova (sem `thread_id`) antes de abrir bugs separados.
 O `api.log` (saída do uvicorn usada nos testes manuais) aparece como arquivo não rastreado no
 `git status`. Adicionar ao `.gitignore`, de preferência com o padrão `*.log`, para cobrir
 outros logs locais.
+
+## COR-03: evals falham com 401 quando `API_KEYS` está definido
+
+**Status:** pendente (encontrada em 2026-10-20, ao rodar o eval da branch `002-api-document-marker`).
+
+**Sintoma.** Com `API_KEYS` preenchido no `.env`, `uv run pytest -m eval` devolve
+`401 unauthorized` ("X-API-Key ausente ou inválida.") em todas as perguntas. Os testes de
+métrica falham em cascata (acerto 0%, "não encontrei" 0%). No CI não aparece porque lá
+`API_KEYS` fica vazio.
+
+**Causa.** Os cinco evals (`test_grounding`, `test_scope`, `test_calc`, `test_advice`,
+`test_followup`) criam `TestClient(create_app())` com as configurações reais, mas não mandam
+`X-API-Key`.
+
+**Contorno.** `API_KEYS= uv run pytest -m eval …` (a variável de ambiente vazia tem prioridade
+sobre o `.env`).
+
+**Correção proposta.** Um helper em `tests/eval/common.py`:
+
+```python
+def auth_headers() -> dict[str, str]:
+    keys = get_settings().API_KEYS
+    return {"X-API-Key": keys[0]} if keys else {}
+```
+
+usado nos cinco arquivos como `TestClient(create_app(), headers=auth_headers())`.
+
+## COR-04: eval de fundamentação não mostra por que uma pergunta errou
+
+**Status:** pendente (encontrada em 2026-10-20).
+
+**Sintoma.** `test_answerable_questions_accuracy` deu 88,5% (23/26, meta 90%) e falhou em
+"Como funciona a tributação de fundos de renda fixa de curto prazo?", "O que é o CDI?" e
+"Quem calcula o IPCA?". Não dá para saber se faltou o fato esperado no texto ou o documento
+esperado nas fontes: `grounding_failures.jsonl` só registra afirmações sem sustentação e saiu
+vazio.
+
+**Correção proposta.** Gravar também as perguntas reprovadas no acerto (em
+`grounding_failures.jsonl` ou num `grounding_misses.jsonl`), com `answer`, `sources`, os
+`expected_facts` que faltaram e se o `expected_source` foi citado.
+
+**Pendente junto.** Confirmar que os 88,5% são oscilação do LLM e não regressão: rodar o mesmo
+eval na `main` e comparar (o campo `marker` não altera respostas nem o critério de acerto).
