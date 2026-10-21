@@ -164,6 +164,10 @@ components:
         page: { type: [integer, 'null'] }
         snippet: { type: string, maxLength: 300 }
         score: { type: number }
+        marker:
+          type: [integer, 'null']
+          minimum: 1
+          description: Número [n] com que o trecho foi citado em `answer`/`content`. Ausente em fontes salvas antes do campo.
     FxQuoteSource:
       type: object
       required: [type, pair, bid, ask, quoted_at, provider]
