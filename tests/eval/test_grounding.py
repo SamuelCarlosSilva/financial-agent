@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from financial_agent.api.app import create_app
+from financial_agent.graph.nodes.agent import cited_markers
 from financial_agent.logging import truncate
 from financial_agent.rag.ingest import load_directory, split_documents
 from financial_agent.tools.document_search import SNIPPET_MAX_CHARS
@@ -180,6 +181,21 @@ def test_unanswerable_questions_cite_no_documents(results: list[dict[str, Any]])
         if document_sources(r["sources"])
     }
     assert not cited, f"perguntas sem resposta com fontes de documento: {cited}"
+
+
+def test_document_markers_match_citations(results: list[dict[str, Any]]) -> None:
+    # Cada [n] da resposta tem uma fonte de documento com `marker == n`, e vice-versa.
+    mismatches = {}
+    for row in results:
+        if row.get("error"):
+            continue
+        markers = [s.get("marker") for s in row["sources"] if s.get("type") == "document"]
+        if None in markers or set(markers) != cited_markers(row["answer"]):
+            mismatches[row["question"]] = {
+                "markers": markers,
+                "cited": sorted(cited_markers(row["answer"])),
+            }
+    assert not mismatches, f"marcadores sem fonte ou fontes sem marcador: {mismatches}"
 
 
 def test_all_claims_supported_and_in_pt_br(results: list[dict[str, Any]]) -> None:
