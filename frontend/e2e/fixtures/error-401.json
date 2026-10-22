@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "X-API-Key ausente ou inválida.",
+    "request_id": "4b1e9c7a2d3f4e5a8b6c0d1e2f3a4b5c"
+  }
+}

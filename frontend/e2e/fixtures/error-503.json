@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "upstream_unavailable",
+    "message": "Serviço temporariamente indisponível.",
+    "request_id": "c3d2e1f0a9b84c7d6e5f4a3b2c1d0e9f"
+  }
+}

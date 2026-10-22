@@ -1,0 +1,27 @@
+{
+  "thread_id": "3f8a2c1e-7b4d-4e9a-8c21-5d6f0a9b1e34",
+  "answer": "O come-cotas é a antecipação semestral do imposto de renda sobre fundos, cobrada em maio e novembro [2]. Nos fundos de curto prazo, a alíquota do come-cotas é de 20% [4].",
+  "scope": "in_scope",
+  "sources": [
+    {
+      "type": "document",
+      "document_id": "come-cotas",
+      "title": "Come-cotas",
+      "source": "come-cotas.md",
+      "page": 1,
+      "snippet": "O come-cotas é a antecipação semestral do imposto de renda, cobrada no último dia útil de maio e de novembro.",
+      "score": 0.8234,
+      "marker": 2
+    },
+    {
+      "type": "document",
+      "document_id": "tributacao-fundos",
+      "title": "Tributação de fundos de investimento",
+      "source": "tributacao-fundos.pdf",
+      "page": 3,
+      "snippet": "Fundos de curto prazo: alíquota de 20% no come-cotas e de 22,5% ou 20% no resgate, conforme o prazo.",
+      "score": 0.7712,
+      "marker": 4
+    }
+  ]
+}

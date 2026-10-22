@@ -1,0 +1,54 @@
+{
+  "thread_id": "3f8a2c1e-7b4d-4e9a-8c21-5d6f0a9b1e34",
+  "messages": [
+    {
+      "role": "user",
+      "content": "O que é come-cotas?",
+      "created_at": "2026-10-17T12:40:00Z",
+      "sources": null
+    },
+    {
+      "role": "assistant",
+      "content": "O come-cotas é a antecipação semestral do imposto de renda sobre fundos, cobrada em maio e novembro [2].",
+      "created_at": "2026-10-17T12:40:08Z",
+      "sources": [
+        {
+          "type": "document",
+          "document_id": "come-cotas",
+          "title": "Come-cotas",
+          "source": "come-cotas.md",
+          "page": 1,
+          "snippet": "O come-cotas é a antecipação semestral do imposto de renda, cobrada no último dia útil de maio e de novembro.",
+          "score": 0.8234,
+          "marker": 2
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Quanto são 500 euros em reais?",
+      "created_at": "2026-10-17T12:41:00Z",
+      "sources": null
+    },
+    {
+      "role": "assistant",
+      "content": "Pela cotação de compra do euro, 6,0123 [1], 500 euros equivalem a R$ 3.006,15 [2].",
+      "created_at": "2026-10-17T12:41:06Z",
+      "sources": [
+        {
+          "type": "fx_quote",
+          "pair": "EUR-BRL",
+          "bid": "6.0123",
+          "ask": "6.0187",
+          "quoted_at": "2026-10-17T09:40:00-03:00",
+          "provider": "awesomeapi"
+        },
+        {
+          "type": "calculation",
+          "expression": "500 * 6.0123",
+          "result": "3006.15"
+        }
+      ]
+    }
+  ]
+}
