@@ -1,0 +1,164 @@
+/* Portado do design system Financial Agent (Claude Design), versão 1792443906-b50c */
+/* Gerado a partir de project/tokens.json. */
+
+:root {
+  color-scheme: light;
+
+  --canvas: #f6f4ef;
+  --surface: #fdfcf9;
+  --surface-sunken: #eeebe4;
+  --line: #dcd7cc;
+  --line-strong: #8a857a;
+  --ink: #1c201e;
+  --ink-muted: #585d58;
+  --brand: #1f5c4a;
+  --brand-strong: #174a3b;
+  --on-brand: #ffffff;
+  --brand-soft: #e2ede7;
+  --source-quote: #1d5785;
+  --source-quote-soft: #e2ebf4;
+  --source-calc: #4a5168;
+  --source-calc-soft: #e8e9f0;
+  --notice: #7a5300;
+  --notice-soft: #faf0d4;
+  --danger: #a8341f;
+  --danger-soft: #f8e4de;
+  --focus: #1d5785;
+
+  --shadow-raised: 0 1px 2px rgba(28, 32, 30, 0.06), 0 2px 8px rgba(28, 32, 30, 0.05);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  --font-serif: 'Newsreader', 'Source Serif 4', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --canvas: #121513;
+    --surface: #1a1e1c;
+    --surface-sunken: #0d0f0e;
+    --line: #2d3330;
+    --line-strong: #6b746f;
+    --ink: #ebeae5;
+    --ink-muted: #a6aba5;
+    --brand: #6cc3a3;
+    --brand-strong: #8ed6bb;
+    --on-brand: #0b1a14;
+    --brand-soft: #1a2f27;
+    --source-quote: #86bbe8;
+    --source-quote-soft: #182838;
+    --source-calc: #b3bad0;
+    --source-calc-soft: #232633;
+    --notice: #e6c06a;
+    --notice-soft: #2e2614;
+    --danger: #f2917a;
+    --danger-soft: #36201b;
+    --focus: #86bbe8;
+
+    --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --canvas: #121513;
+  --surface: #1a1e1c;
+  --surface-sunken: #0d0f0e;
+  --line: #2d3330;
+  --line-strong: #6b746f;
+  --ink: #ebeae5;
+  --ink-muted: #a6aba5;
+  --brand: #6cc3a3;
+  --brand-strong: #8ed6bb;
+  --on-brand: #0b1a14;
+  --brand-soft: #1a2f27;
+  --source-quote: #86bbe8;
+  --source-quote-soft: #182838;
+  --source-calc: #b3bad0;
+  --source-calc-soft: #232633;
+  --notice: #e6c06a;
+  --notice-soft: #2e2614;
+  --danger: #f2917a;
+  --danger-soft: #36201b;
+  --focus: #86bbe8;
+
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Estilos de texto */
+
+.type-display {
+  font-family: var(--font-serif);
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.type-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 500;
+}
+
+.type-heading {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.type-body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.type-body-sm {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.type-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.type-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.type-figure {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}

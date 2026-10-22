@@ -1,0 +1,17 @@
+{
+  "thread_id": "8d3a5c7e-2f4b-4a6d-9c8e-1b3f5a7d9e20",
+  "answer": "O CDB é um título de renda fixa emitido por bancos e coberto pelo FGC até R$ 250 mil por CPF e por instituição [1]. A escolha entre CDB e Tesouro depende do seu prazo e da sua tolerância a risco.\n\nEsta resposta é informativa e não constitui recomendação de investimento.",
+  "scope": "in_scope",
+  "sources": [
+    {
+      "type": "document",
+      "document_id": "fgc",
+      "title": "Fundo Garantidor de Créditos",
+      "source": "fgc.md",
+      "page": null,
+      "snippet": "O FGC garante até R$ 250 mil por CPF e por instituição financeira, com teto global de R$ 1 milhão a cada quatro anos.",
+      "score": 0.8811,
+      "marker": 1
+    }
+  ]
+}
