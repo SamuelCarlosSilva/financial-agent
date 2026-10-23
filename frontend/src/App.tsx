@@ -2,8 +2,10 @@ import { useEffect } from 'react';
 
 import { AppLayout } from './AppLayout';
 import { Composer } from './design-system/components/Composer';
+import { ErrorBanner } from './design-system/components/ErrorBanner';
 import { ChatView } from './features/chat/ChatView';
 import { useConversation } from './features/chat/useConversation';
+import { useServiceHealth } from './features/chat/useServiceHealth';
 import { ThreadSidebar } from './features/threads/ThreadSidebar';
 import {
   threadFromHash,
@@ -17,9 +19,19 @@ function replaceHash(hash: string) {
 }
 
 export function App() {
-  const { threadId, turns, status, expired, loadError, submit, openThread, newConversation } =
-    useConversation();
+  const {
+    threadId,
+    turns,
+    status,
+    expired,
+    loadError,
+    submit,
+    retry,
+    openThread,
+    newConversation,
+  } = useConversation();
   const entries = useThreadIndex();
+  const health = useServiceHealth();
 
   // A URL segue a conversa: `#/t/<id>` quando ela ganha id, `#/` quando expira.
   useEffect(() => {
@@ -61,7 +73,18 @@ export function App() {
       threadId={threadId}
       composer={<Composer busy={status !== 'idle'} onSubmit={(m) => void submit(m)} />}
     >
-      <ChatView turns={turns} status={status} expired={expired} loadError={loadError} />
+      {/* Fica no topo enquanto o serviço estiver fora; o composer continua usável. */}
+      {health.down ? <ErrorBanner {...health.down} onRetry={() => void health.recheck()} /> : null}
+      <ChatView
+        turns={turns}
+        status={status}
+        expired={expired}
+        loadError={loadError}
+        onRetry={(id) => void retry(id)}
+        onReloadThread={() => {
+          if (threadId) void openThread(threadId);
+        }}
+      />
     </AppLayout>
   );
 }

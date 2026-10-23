@@ -162,15 +162,15 @@ novo"; religar e tentar de novo com sucesso, sem redigitar.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T045 [P] [US4] Write `frontend/src/design-system/components/ErrorBanner.test.tsx`: `role="alert"`; for each row of the "Erros" table of `contracts/client-api.md` the title/text in pt-BR, the `request_id` in mono when present, and "Tentar de novo" only when `onRetry` is given
-- [ ] T046 [P] [US4] Write `frontend/e2e/us4-errors.spec.ts`: 503 → banner with `request_id` and "Tentar de novo", which resends the same question with the same `thread_id` (assert the body of the 2nd request) and, with the route now answering 200, shows the answer in place of the error; 401 → authorization message without retry; 422 → "A mensagem não foi aceita: …"; 502 with an HTML body and `route.abort()` (network) → unavailability with retry; the error looks different from the US2 notices (different class/role)
+- [X] T045 [P] [US4] Write `frontend/src/design-system/components/ErrorBanner.test.tsx`: `role="alert"`; for each row of the "Erros" table of `contracts/client-api.md` the title/text in pt-BR, the `request_id` in mono when present, and "Tentar de novo" only when `onRetry` is given
+- [X] T046 [P] [US4] Write `frontend/e2e/us4-errors.spec.ts`: 503 → banner with `request_id` and "Tentar de novo", which resends the same question with the same `thread_id` (assert the body of the 2nd request) and, with the route now answering 200, shows the answer in place of the error; 401 → authorization message without retry; 422 → "A mensagem não foi aceita: …"; 502 with an HTML body and `route.abort()` (network) → unavailability with retry; the error looks different from the US2 notices (different class/role)
 
 ### Implementation for User Story 4
 
-- [ ] T047 [P] [US4] Port `ErrorBanner` to `frontend/src/design-system/components/ErrorBanner.tsx` (+ `.css`; `danger`/`danger-soft`, `role="alert"`, `alert` icon) with props `status`, `error`, `onRetry`; titles and texts exactly as in the "Erros" table of `contracts/client-api.md`
-- [ ] T048 [US4] Add `retry(turnId)` to `useConversation.ts`: only for a `failed` turn with `isRetryable(error)`, resends the same `question` with the current `threadId`, reusing the same turn (`failed` → `sending` → `answered|failed`)
-- [ ] T049 [US4] Render `ErrorBanner` in `ChatView.tsx` for `failed` turns (replacing the simple text of T032), with `onRetry` only when `isRetryable`
-- [ ] T050 [US4] Check availability on load in `App.tsx` (FR-021): `getHealth()` once; on 503 or a network failure, show a persistent `ErrorBanner` at the top ("O serviço está indisponível no momento.") with "Tentar de novo" calling `getHealth()` again; the composer stays usable. Cover it in `us4-errors.spec.ts`
+- [X] T047 [P] [US4] Port `ErrorBanner` to `frontend/src/design-system/components/ErrorBanner.tsx` (+ `.css`; `danger`/`danger-soft`, `role="alert"`, `alert` icon) with props `status`, `error`, `onRetry`; titles and texts exactly as in the "Erros" table of `contracts/client-api.md`
+- [X] T048 [US4] Add `retry(turnId)` to `useConversation.ts`: only for a `failed` turn with `isRetryable(error)`, resends the same `question` with the current `threadId`, reusing the same turn (`failed` → `sending` → `answered|failed`)
+- [X] T049 [US4] Render `ErrorBanner` in `ChatView.tsx` for `failed` turns (replacing the simple text of T032), with `onRetry` only when `isRetryable`
+- [X] T050 [US4] Check availability on load in `App.tsx` (FR-021): `getHealth()` once; on 503 or a network failure, show a persistent `ErrorBanner` at the top ("O serviço está indisponível no momento.") with "Tentar de novo" calling `getHealth()` again; the composer stays usable. Cover it in `us4-errors.spec.ts`
 
 **Checkpoint**: US1–US4. Todas as respostas e falhas da API têm apresentação própria.
 

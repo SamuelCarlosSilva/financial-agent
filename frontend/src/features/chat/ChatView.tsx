@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { isRetryable } from '../../api/client';
+import { ErrorBanner } from '../../design-system/components/ErrorBanner';
 import { MessageBubble } from '../../design-system/components/MessageBubble';
 import { ScopeNotice } from '../../design-system/components/ScopeNotice';
 import { SourceCard } from '../../design-system/components/SourceCard';
@@ -9,7 +11,15 @@ import { presentTurn } from './presentTurn';
 import type { ConversationState, Turn } from './useConversation';
 import './ChatView.css';
 
-type ChatViewProps = Pick<ConversationState, 'turns' | 'status' | 'expired' | 'loadError'>;
+interface ChatViewProps extends Pick<
+  ConversationState,
+  'turns' | 'status' | 'expired' | 'loadError'
+> {
+  /** Reenvia a pergunta de um turno que falhou (só falhas transitórias). */
+  onRetry: (turnId: number) => void;
+  /** Tenta carregar de novo o histórico que falhou. */
+  onReloadThread: () => void;
+}
 
 const EXPIRED_TEXT = 'Esta conversa expirou e foi apagada. Abrimos uma nova.';
 
@@ -62,7 +72,14 @@ function AnsweredTurn({
   );
 }
 
-export function ChatView({ turns, status, expired, loadError }: ChatViewProps) {
+export function ChatView({
+  turns,
+  status,
+  expired,
+  loadError,
+  onRetry,
+  onReloadThread,
+}: ChatViewProps) {
   const [active, setActive] = useState<ActiveCitation | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -92,7 +109,9 @@ export function ChatView({ turns, status, expired, loadError }: ChatViewProps) {
   }
 
   if (loadError) {
-    return <p className="chat-failed">{loadError.error.message}</p>;
+    return (
+      <ErrorBanner {...loadError} onRetry={isRetryable(loadError) ? onReloadThread : undefined} />
+    );
   }
 
   if (turns.length === 0) {
@@ -129,7 +148,10 @@ export function ChatView({ turns, status, expired, loadError }: ChatViewProps) {
             />
           ) : null}
           {turn.status === 'failed' && turn.error ? (
-            <p className="chat-failed">{turn.error.error.message}</p>
+            <ErrorBanner
+              {...turn.error}
+              onRetry={isRetryable(turn.error) ? () => onRetry(turn.id) : undefined}
+            />
           ) : null}
         </div>
       ))}
