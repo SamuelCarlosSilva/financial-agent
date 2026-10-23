@@ -35,8 +35,14 @@ export function AppLayout({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setDrawerOpen(false);
     };
+    // Abrir uma conversa (ou começar outra) muda o hash: a gaveta fecha no celular.
+    const onNavigate = () => setDrawerOpen(false);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('hashchange', onNavigate);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('hashchange', onNavigate);
+    };
   }, [drawerOpen]);
 
   return (

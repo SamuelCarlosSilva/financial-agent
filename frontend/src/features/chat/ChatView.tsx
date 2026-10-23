@@ -6,12 +6,12 @@ import { SourceCard } from '../../design-system/components/SourceCard';
 import { formatTime } from '../../lib/format';
 import { renderSegments } from './citations';
 import { presentTurn } from './presentTurn';
-import type { Turn } from './useConversation';
+import type { ConversationState, Turn } from './useConversation';
 import './ChatView.css';
 
-interface ChatViewProps {
-  turns: Turn[];
-}
+type ChatViewProps = Pick<ConversationState, 'turns' | 'status' | 'expired' | 'loadError'>;
+
+const EXPIRED_TEXT = 'Esta conversa expirou e foi apagada. Abrimos uma nova.';
 
 interface ActiveCitation {
   turnId: number;
@@ -62,7 +62,7 @@ function AnsweredTurn({
   );
 }
 
-export function ChatView({ turns }: ChatViewProps) {
+export function ChatView({ turns, status, expired, loadError }: ChatViewProps) {
   const [active, setActive] = useState<ActiveCitation | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
@@ -77,9 +77,28 @@ export function ChatView({ turns }: ChatViewProps) {
     document.getElementById(cardId(turnId, n))?.scrollIntoView({ block: 'nearest' });
   }
 
+  const expiredNotice = expired ? (
+    <ScopeNotice variant="not_found" title="Conversa expirada">
+      {EXPIRED_TEXT}
+    </ScopeNotice>
+  ) : null;
+
+  if (status === 'loading') {
+    return (
+      <div role="status" className="chat-pending">
+        Carregando a conversa…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return <p className="chat-failed">{loadError.error.message}</p>;
+  }
+
   if (turns.length === 0) {
     return (
       <div className="chat-empty">
+        {expiredNotice}
         <p className="type-display">Financial Agent</p>
         <p className="chat-empty-hint">
           Pergunte sobre investimentos, câmbio, produtos financeiros ou cálculos. Toda resposta
@@ -91,6 +110,7 @@ export function ChatView({ turns }: ChatViewProps) {
 
   return (
     <>
+      {expiredNotice}
       {turns.map((turn) => (
         <div key={turn.id} className="chat-turn">
           <MessageBubble role="user" time={formatTime(turn.askedAt)}>
