@@ -1,27 +1,67 @@
+import { useEffect } from 'react';
+
 import { AppLayout } from './AppLayout';
 import { Composer } from './design-system/components/Composer';
 import { ChatView } from './features/chat/ChatView';
 import { useConversation } from './features/chat/useConversation';
+import { ThreadSidebar } from './features/threads/ThreadSidebar';
+import {
+  threadFromHash,
+  threadPath,
+  titleFrom,
+  useThreadIndex,
+} from './features/threads/threadIndex';
 
-const TITLE_MAX = 60;
-
-/** Título da conversa: a primeira pergunta, cortada em 60 caracteres com "…". */
-function conversationTitle(question: string | undefined): string | undefined {
-  const text = question?.trim().replace(/\s+/g, ' ');
-  if (!text) return undefined;
-  return text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1).trimEnd()}…` : text;
+function replaceHash(hash: string) {
+  if (window.location.hash !== hash) window.history.replaceState(null, '', hash);
 }
 
 export function App() {
-  const { threadId, turns, status, submit } = useConversation();
+  const { threadId, turns, status, expired, loadError, submit, openThread, newConversation } =
+    useConversation();
+  const entries = useThreadIndex();
+
+  // A URL segue a conversa: `#/t/<id>` quando ela ganha id, `#/` quando expira.
+  useEffect(() => {
+    if (threadId) replaceHash(threadPath(threadId));
+    else if (expired) replaceHash(threadPath());
+  }, [threadId, expired]);
+
+  // E a conversa segue a URL: na carga, no Voltar/Avançar e ao escolher na lista.
+  useEffect(() => {
+    function sync() {
+      const id = threadFromHash(window.location.hash);
+      if (id) {
+        void openThread(id);
+        return;
+      }
+      newConversation();
+      replaceHash(threadPath());
+    }
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, [openThread, newConversation]);
+
+  const title =
+    entries.find((entry) => entry.id === threadId)?.title ?? titleFrom(turns[0]?.question);
 
   return (
     <AppLayout
-      title={conversationTitle(turns[0]?.question)}
+      sidebar={
+        <ThreadSidebar
+          activeId={threadId}
+          onNew={() => {
+            newConversation();
+            window.location.hash = threadPath();
+          }}
+        />
+      }
+      title={title}
       threadId={threadId}
-      composer={<Composer busy={status === 'sending'} onSubmit={(m) => void submit(m)} />}
+      composer={<Composer busy={status !== 'idle'} onSubmit={(m) => void submit(m)} />}
     >
-      <ChatView turns={turns} />
+      <ChatView turns={turns} status={status} expired={expired} loadError={loadError} />
     </AppLayout>
   );
 }
