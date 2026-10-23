@@ -1,0 +1,33 @@
+/* Portado do design system Financial Agent (Claude Design), versão 1792443906-b50c */
+
+.fa-cite {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  margin: 0 2px;
+  vertical-align: 2px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--brand-soft);
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.fa-cite:hover,
+.fa-cite.is-active {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.fa-cite-static {
+  cursor: default;
+  margin: 0;
+}

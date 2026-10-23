@@ -5,6 +5,8 @@ export interface MockResponse {
   status?: number;
   body?: unknown;
   headers?: Record<string, string>;
+  /** Segura a resposta por este tempo, para testar o estado de espera. */
+  delayMs?: number;
 }
 
 /** Uma resposta fixa, uma sequência (uma por chamada, a última se repete) ou uma função. */
@@ -73,6 +75,7 @@ export async function mockApi(page: Page, handlers: MockHandlers = {}) {
     }
 
     const response = pick(handler, request, calls[name]++);
+    if (response.delayMs) await new Promise((resolve) => setTimeout(resolve, response.delayMs));
     await route.fulfill({
       status: response.status ?? 200,
       json: response.body ?? {},

@@ -1,70 +1,27 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { AppLayout } from './AppLayout';
+import { Composer } from './design-system/components/Composer';
+import { ChatView } from './features/chat/ChatView';
+import { useConversation } from './features/chat/useConversation';
 
-import { Button } from './design-system/components/Button';
-import './App.css';
+const TITLE_MAX = 60;
 
-interface AppProps {
-  /** Lista de conversas (ThreadSidebar). */
-  sidebar?: ReactNode;
-  title?: string;
-  threadId?: string | null;
-  /** Conteúdo do log: mensagens, avisos, erros. */
-  children?: ReactNode;
-  /** Composer fixo no rodapé. */
-  composer?: ReactNode;
+/** Título da conversa: a primeira pergunta, cortada em 60 caracteres com "…". */
+function conversationTitle(question: string | undefined): string | undefined {
+  const text = question?.trim().replace(/\s+/g, ' ');
+  if (!text) return undefined;
+  return text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1).trimEnd()}…` : text;
 }
 
-const SIDEBAR_ID = 'app-sidebar';
-
-/** `6f1c2a9e-…-0d2f8e7c1a23` → `6f1c2a9e…1a23`, como no ChatScreen do design system. */
-function shortThreadId(id: string): string {
-  return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
-}
-
-export function App({ sidebar, title = 'Nova conversa', threadId, children, composer }: AppProps) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDrawerOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [drawerOpen]);
+export function App() {
+  const { threadId, turns, status, submit } = useConversation();
 
   return (
-    <div className={drawerOpen ? 'app is-drawer-open' : 'app'}>
-      <aside id={SIDEBAR_ID} className="app-sidebar">
-        <div className="app-brand">Financial Agent</div>
-        {sidebar}
-      </aside>
-      {drawerOpen ? (
-        // Fundo da gaveta no celular: tocar fora fecha (Esc e o botão também fecham).
-        <div className="app-scrim" aria-hidden="true" onClick={() => setDrawerOpen(false)} />
-      ) : null}
-      <main className="app-main">
-        <header className="app-top">
-          <Button
-            className="app-drawer-toggle"
-            aria-expanded={drawerOpen}
-            aria-controls={SIDEBAR_ID}
-            onClick={() => setDrawerOpen((open) => !open)}
-          >
-            Conversas
-          </Button>
-          <h1 className="app-title type-title">{title}</h1>
-          {threadId ? (
-            <span className="app-thread-id type-mono" title={threadId}>
-              thread {shortThreadId(threadId)}
-            </span>
-          ) : null}
-        </header>
-        <div className="app-log" role="log" aria-label="Conversa">
-          {children}
-        </div>
-        {composer ? <div className="app-dock">{composer}</div> : null}
-      </main>
-    </div>
+    <AppLayout
+      title={conversationTitle(turns[0]?.question)}
+      threadId={threadId}
+      composer={<Composer busy={status === 'sending'} onSubmit={(m) => void submit(m)} />}
+    >
+      <ChatView turns={turns} />
+    </AppLayout>
   );
 }
