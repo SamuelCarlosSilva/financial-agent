@@ -1,0 +1,45 @@
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.chat-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2);
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .chat-sources {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.chat-pending {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.chat-failed {
+  margin: 0;
+  color: var(--danger);
+}
+
+.chat-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block: var(--space-7);
+}
+
+.chat-empty .type-display {
+  margin: 0;
+}
+
+.chat-empty-hint {
+  margin: 0;
+  color: var(--ink-muted);
+}

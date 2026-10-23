@@ -5,3 +5,8 @@ import { afterEach } from 'vitest';
 afterEach(() => {
   cleanup();
 });
+
+// O jsdom não implementa scrollIntoView, usado ao destacar um cartão de fonte.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => undefined;
+}
