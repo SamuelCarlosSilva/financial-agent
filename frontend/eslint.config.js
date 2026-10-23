@@ -17,5 +17,7 @@ export default defineConfig(
   },
   reactHooks.configs.flat.recommended,
   jsxA11y.flatConfigs.recommended,
+  // `role` em componentes (ex.: MessageBubble role="user") é prop, não papel ARIA.
+  { rules: { 'jsx-a11y/aria-role': ['error', { ignoreNonDOM: true }] } },
   { files: ['**/*.js'], extends: [tseslint.configs.disableTypeChecked] },
 );
