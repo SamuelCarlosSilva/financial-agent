@@ -1,0 +1,41 @@
+/* Portado do design system Financial Agent (Claude Design), versão 1792443906-b50c */
+
+.fa-notice {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--notice-soft);
+  color: var(--ink);
+  border: 1px solid transparent;
+  max-width: 640px;
+}
+
+.fa-notice > .fa-icon {
+  color: var(--notice);
+  margin-top: 4px;
+}
+
+.fa-notice-title {
+  font-weight: 600;
+}
+
+.fa-notice-text {
+  font-size: 14px;
+  line-height: 22px;
+  /* O texto da API é exibido como veio, com as quebras de linha (FR-009). */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.fa-notice-refused,
+.fa-notice-not_found {
+  background: var(--surface-sunken);
+  border-color: var(--line);
+}
+
+.fa-notice-refused > .fa-icon,
+.fa-notice-not_found > .fa-icon {
+  color: var(--ink-muted);
+}

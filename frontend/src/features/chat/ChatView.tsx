@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { MessageBubble } from '../../design-system/components/MessageBubble';
+import { ScopeNotice } from '../../design-system/components/ScopeNotice';
 import { SourceCard } from '../../design-system/components/SourceCard';
 import { formatTime } from '../../lib/format';
 import { renderSegments } from './citations';
@@ -31,6 +32,9 @@ function AnsweredTurn({
   onCite: (n: number) => void;
 }) {
   const p = presentTurn(turn.response);
+  // Recusa, esclarecimento e "não encontrei" são avisos, não respostas: sem bolha e sem fontes.
+  if (p.variant !== 'answer') return <ScopeNotice variant={p.variant}>{p.body}</ScopeNotice>;
+
   const footer =
     p.sources.length > 0 ? (
       <div className="chat-sources">
@@ -47,9 +51,14 @@ function AnsweredTurn({
     ) : null;
 
   return (
-    <MessageBubble role="assistant" footer={footer}>
-      {renderSegments(p.segments, { activeIndex: active, onCite })}
-    </MessageBubble>
+    <>
+      <MessageBubble role="assistant" footer={footer}>
+        {renderSegments(p.segments, { activeIndex: active, onCite })}
+      </MessageBubble>
+      {p.advice !== undefined ? (
+        <ScopeNotice variant="advice">{p.advice || null}</ScopeNotice>
+      ) : null}
+    </>
   );
 }
 
