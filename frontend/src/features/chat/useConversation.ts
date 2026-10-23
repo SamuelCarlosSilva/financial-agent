@@ -1,7 +1,7 @@
 // Estado da conversa aberta (máquina de estados de data-model.md).
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, type Dispatch } from 'react';
 
-import { ApiRequestError, getThreadMessages, postChat } from '../../api/client';
+import { ApiRequestError, getThreadMessages, isRetryable, postChat } from '../../api/client';
 import type { ApiFailure, ChatResponse, ThreadHistory } from '../../api/types';
 import { threadIndex } from '../threads/threadIndex';
 import type { TurnInput } from './presentTurn';
@@ -28,6 +28,7 @@ export interface ConversationState {
 
 type Action =
   | { type: 'sent'; turn: Turn }
+  | { type: 'retrying'; id: number }
   | { type: 'answered'; id: number; response: ChatResponse }
   | { type: 'failed'; id: number; error: ApiFailure }
   | { type: 'loading'; threadId: string }
@@ -50,6 +51,17 @@ export function conversationReducer(state: ConversationState, action: Action): C
         status: 'sending',
         expired: false,
         turns: [...state.turns, action.turn],
+      };
+    case 'retrying':
+      // O mesmo turno volta a `sending`: a pergunta não se repete na tela.
+      return {
+        ...state,
+        status: 'sending',
+        turns: state.turns.map((turn) =>
+          turn.id === action.id
+            ? { id: turn.id, question: turn.question, askedAt: turn.askedAt, status: 'sending' }
+            : turn,
+        ),
       };
     case 'answered':
       // A conversa pode ter sido trocada enquanto a resposta não chegava.
@@ -114,6 +126,30 @@ export function turnsFromHistory(history: ThreadHistory, firstId = 1): Turn[] {
   return turns;
 }
 
+/** Envia a pergunta do turno `id` e registra nele a resposta, ou a falha. */
+async function deliver(
+  dispatch: Dispatch<Action>,
+  id: number,
+  question: string,
+  threadId: string | undefined,
+  firstQuestion: string,
+) {
+  try {
+    const response = await postChat({
+      message: question,
+      ...(threadId ? { thread_id: threadId } : {}),
+    });
+    threadIndex.upsert({
+      id: response.thread_id,
+      firstQuestion,
+      lastActivity: new Date().toISOString(),
+    });
+    dispatch({ type: 'answered', id, response });
+  } catch (error) {
+    dispatch({ type: 'failed', id, error: toFailure(error) });
+  }
+}
+
 export function useConversation() {
   const [state, dispatch] = useReducer(conversationReducer, initialState);
   // Espelho síncrono do estado: dois Enter no mesmo tick não podem disparar dois envios.
@@ -133,21 +169,19 @@ export function useConversation() {
     const turn: Turn = { id, question, askedAt: new Date(), status: 'sending' };
     current.current = { ...current.current, status: 'sending' };
     dispatch({ type: 'sent', turn });
+    await deliver(dispatch, id, question, threadId, turns[0]?.question ?? question);
+  }, []);
 
-    try {
-      const response = await postChat({
-        message: question,
-        ...(threadId ? { thread_id: threadId } : {}),
-      });
-      threadIndex.upsert({
-        id: response.thread_id,
-        firstQuestion: turns[0]?.question ?? question,
-        lastActivity: new Date().toISOString(),
-      });
-      dispatch({ type: 'answered', id, response });
-    } catch (error) {
-      dispatch({ type: 'failed', id, error: toFailure(error) });
-    }
+  /** Reenvia a pergunta de um turno que falhou por motivo transitório, na conversa atual. */
+  const retry = useCallback(async (id: number) => {
+    const { status, threadId, turns } = current.current;
+    const turn = turns.find((t) => t.id === id);
+    if (status !== 'idle' || turn?.status !== 'failed' || !turn.error) return;
+    if (!isRetryable(turn.error)) return;
+
+    current.current = { ...current.current, status: 'sending' };
+    dispatch({ type: 'retrying', id });
+    await deliver(dispatch, id, turn.question, threadId, turns[0]?.question ?? turn.question);
   }, []);
 
   const openThread = useCallback(async (threadId: string) => {
@@ -182,5 +216,5 @@ export function useConversation() {
     dispatch({ type: 'reset' });
   }, []);
 
-  return { ...state, submit, openThread, newConversation };
+  return { ...state, submit, retry, openThread, newConversation };
 }
