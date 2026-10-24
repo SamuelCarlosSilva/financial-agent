@@ -14,6 +14,8 @@ export interface Turn {
   /** A resposta do chat ou, vinda do histórico, sem `scope`. */
   response?: TurnInput;
   error?: ApiFailure;
+  /** Veio do histórico (os passos começam recolhidos). */
+  fromHistory?: true;
 }
 
 export interface ConversationState {
@@ -120,6 +122,7 @@ export function turnsFromHistory(history: ThreadHistory, firstId = 1): Turn[] {
       askedAt: new Date(question.created_at ?? answer.created_at ?? Date.now()),
       status: 'answered',
       response: { answer: answer.content, sources: answer.sources ?? [] },
+      fromHistory: true,
     });
     i++;
   }
