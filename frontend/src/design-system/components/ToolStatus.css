@@ -1,0 +1,85 @@
+/* Portado do design system Financial Agent (Claude Design), versão 1792443906-b50c */
+
+.fa-tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fa-tools[hidden] {
+  display: none;
+}
+
+.fa-tool {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.fa-tool-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--brand);
+  flex: none;
+}
+
+.fa-tool.is-running {
+  color: var(--ink);
+}
+
+.fa-tool.is-running .fa-tool-dot {
+  background: var(--brand);
+  animation: fa-pulse 1.2s ease-in-out infinite;
+}
+
+.fa-tool.is-done .fa-tool-dot {
+  background: var(--brand);
+}
+
+.fa-tool.is-error {
+  color: var(--danger);
+}
+
+.fa-tool.is-error .fa-tool-dot {
+  border-color: var(--danger);
+  background: var(--danger);
+  border-radius: 1px;
+}
+
+.fa-tool-detail {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.fa-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes fa-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-tool.is-running .fa-tool-dot {
+    animation: none;
+  }
+}
