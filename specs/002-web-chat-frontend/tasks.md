@@ -185,14 +185,14 @@ e, ao responder, os passos cotação (com o par) e cálculo (com a expressão) c
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T051 [P] [US5] Extend `presentTurn.test.ts` with `steps` per research §4: `sending` → `[{tool:'guardrail', state:'running'}]`; `out_of_scope`/`ambiguous` → only `guardrail done`; sources `document`, `fx_quote`, `calculation` → one step per type, in order of first appearance, with `detail` = document title / `pair` / `expression`, then `verify_grounding done`; `not_found` without sources → only `guardrail done`
-- [ ] T052 [P] [US5] Write `frontend/e2e/us5-steps.spec.ts`: with a delayed route, the "running" step is visible and announced (`aria-live="polite"`); after `answer-fx-calc`, the steps "Cotação EUR-BRL" and "Cálculo 500 * 6.0123" appear done; the summary collapses and expands with the keyboard (`aria-expanded`)
+- [X] T051 [P] [US5] Extend `presentTurn.test.ts` with `steps` per research §4: `sending` → `[{tool:'guardrail', state:'running'}]`; `out_of_scope`/`ambiguous` → only `guardrail done`; sources `document`, `fx_quote`, `calculation` → one step per type, in order of first appearance, with `detail` = document title / `pair` / `expression`, then `verify_grounding done`; `not_found` without sources → only `guardrail done`
+- [X] T052 [P] [US5] Write `frontend/e2e/us5-steps.spec.ts`: with a delayed route, the "running" step is visible and announced (`aria-live="polite"`); after `answer-fx-calc`, the steps "Cotação EUR-BRL" and "Cálculo 500 * 6.0123" appear done; the summary collapses and expands with the keyboard (`aria-expanded`)
 
 ### Implementation for User Story 5
 
-- [ ] T053 [P] [US5] Port `ToolStatus` to `frontend/src/design-system/components/ToolStatus.tsx` (+ `.css`) with `steps: ToolStep[]` (`tool`, `label?`, `state`, `detail?`), pt-BR labels per tool, screen-reader text per state, `aria-live="polite"`, a pulsing dot only in `running` and disabled under `prefers-reduced-motion`
-- [ ] T054 [US5] Add `steps` to `presentTurn.ts` (and a `pendingSteps()` for the `sending` state) per T051
-- [ ] T055 [US5] In `ChatView.tsx`, replace the waiting text from T032 with `ToolStatus` (`pendingSteps()`), and show `ToolStatus` with the turn's `steps` above each answer, collapsible through a button with `aria-expanded` (expanded on the newest turn, collapsed on history turns)
+- [X] T053 [P] [US5] Port `ToolStatus` to `frontend/src/design-system/components/ToolStatus.tsx` (+ `.css`) with `steps: ToolStep[]` (`tool`, `label?`, `state`, `detail?`), pt-BR labels per tool, screen-reader text per state, `aria-live="polite"`, a pulsing dot only in `running` and disabled under `prefers-reduced-motion`
+- [X] T054 [US5] Add `steps` to `presentTurn.ts` (and a `pendingSteps()` for the `sending` state) per T051
+- [X] T055 [US5] In `ChatView.tsx`, replace the waiting text from T032 with `ToolStatus` (`pendingSteps()`), and show `ToolStatus` with the turn's `steps` above each answer, collapsible through a button with `aria-expanded` (expanded on the newest turn, collapsed on history turns)
 
 **Checkpoint**: todas as histórias funcionam de forma independente.
 
