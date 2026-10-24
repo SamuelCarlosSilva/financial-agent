@@ -6,6 +6,7 @@ import {
   OUT_OF_SCOPE_MESSAGE,
 } from '../../api/messages';
 import type { Scope, SourceCitation } from '../../api/types';
+import type { ToolStep } from '../../design-system/components/ToolStatus';
 
 /** Fonte com o número exibido no cartão. */
 export interface IndexedSource {
@@ -16,17 +17,6 @@ export interface IndexedSource {
 /** Trecho do corpo: texto ou um `[n]` ligado à fonte `sources[sourceIndex]`. */
 export type Segment =
   { kind: 'text'; text: string } | { kind: 'cite'; n: number; sourceIndex: number };
-
-export interface ToolStep {
-  tool:
-    | 'guardrail'
-    | 'search_financial_documents'
-    | 'get_currency_quote'
-    | 'calculate'
-    | 'verify_grounding';
-  state: 'running' | 'done' | 'error';
-  detail?: string;
-}
 
 export interface TurnPresentation {
   variant: 'answer' | 'refused' | 'clarify' | 'not_found';
@@ -116,12 +106,50 @@ export function splitAdvice(answer: string): { body: string; advice: string } | 
   return { body: kept + gap + after, advice: answer.slice(start, stop) };
 }
 
+/** Passos enquanto a resposta não chega: a API não informa o progresso, só o guardrail. */
+export function pendingSteps(): ToolStep[] {
+  return [{ tool: 'guardrail', state: 'running' }];
+}
+
+const TOOL_BY_SOURCE = {
+  document: 'search_financial_documents',
+  fx_quote: 'get_currency_quote',
+  calculation: 'calculate',
+} as const;
+
+function sourceDetail(source: SourceCitation): string {
+  switch (source.type) {
+    case 'document':
+      return source.title;
+    case 'fx_quote':
+      return source.pair;
+    case 'calculation':
+      return source.expression;
+  }
+}
+
+/**
+ * Passos reconstruídos das fontes (research §4): o guardrail, um passo por tipo de fonte na
+ * ordem em que aparece (detalhe da primeira fonte do tipo) e, havendo fontes, a verificação.
+ */
+function stepsFrom(sources: SourceCitation[]): ToolStep[] {
+  const steps: ToolStep[] = [{ tool: 'guardrail', state: 'done' }];
+  const seen = new Set<SourceCitation['type']>();
+  for (const source of sources) {
+    if (seen.has(source.type)) continue;
+    seen.add(source.type);
+    steps.push({ tool: TOOL_BY_SOURCE[source.type], state: 'done', detail: sourceDetail(source) });
+  }
+  if (sources.length > 0) steps.push({ tool: 'verify_grounding', state: 'done' });
+  return steps;
+}
+
 function notice(variant: 'refused' | 'clarify' | 'not_found', answer: string): TurnPresentation {
   return {
     variant,
     body: answer,
     sources: [],
-    steps: [],
+    steps: stepsFrom([]),
     segments: [{ kind: 'text', text: answer }],
   };
 }
@@ -148,7 +176,7 @@ export function presentTurn({ answer, scope, sources }: TurnInput): TurnPresenta
     body,
     ...(split ? { advice: split.advice } : {}),
     sources: indexSources(list),
-    steps: [],
+    steps: stepsFrom(list),
     segments: segmentBody(body, list),
   };
 }

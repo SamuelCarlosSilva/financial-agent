@@ -12,7 +12,7 @@ import {
   NOT_FOUND_MESSAGE,
   OUT_OF_SCOPE_MESSAGE,
 } from '../../api/messages';
-import { presentTurn } from './presentTurn';
+import { pendingSteps, presentTurn } from './presentTurn';
 
 function doc(marker: number | null | undefined, title = `Doc ${marker}`): DocumentSource {
   return {
@@ -205,5 +205,52 @@ describe('presentTurn: recusas e avisos (research §4, regras 1–4)', () => {
 
   it('sem o núcleo do aviso, não há advice', () => {
     expect(presentTurn({ answer: 'Só uma resposta.' }).advice).toBeUndefined();
+  });
+});
+
+describe('presentTurn: passos do agente (research §4, US5)', () => {
+  const GUARDRAIL_DONE = { tool: 'guardrail', state: 'done' };
+
+  it('enquanto espera, só o guardrail em andamento', () => {
+    expect(pendingSteps()).toEqual([{ tool: 'guardrail', state: 'running' }]);
+  });
+
+  it('fora de escopo ou ambígua param no guardrail', () => {
+    expect(presentTurn({ answer: OUT_OF_SCOPE_MESSAGE, scope: 'out_of_scope' }).steps).toEqual([
+      GUARDRAIL_DONE,
+    ]);
+    expect(presentTurn({ answer: CLARIFY_MESSAGE, scope: 'ambiguous' }).steps).toEqual([
+      GUARDRAIL_DONE,
+    ]);
+    // No histórico não há scope: a recusa é reconhecida pelo texto.
+    expect(presentTurn({ answer: OUT_OF_SCOPE_MESSAGE }).steps).toEqual([GUARDRAIL_DONE]);
+  });
+
+  it('um passo por tipo de fonte, na ordem em que aparece, e a verificação no fim', () => {
+    const p = presentTurn({
+      answer: 'r',
+      scope: 'in_scope',
+      sources: [fx, doc(2, 'Come-cotas'), calc, doc(4, 'Outro'), fx],
+    });
+
+    expect(p.steps).toEqual([
+      GUARDRAIL_DONE,
+      { tool: 'get_currency_quote', state: 'done', detail: 'EUR-BRL' },
+      { tool: 'search_financial_documents', state: 'done', detail: 'Come-cotas' },
+      { tool: 'calculate', state: 'done', detail: '500 * 6.0123' },
+      { tool: 'verify_grounding', state: 'done' },
+    ]);
+  });
+
+  it('"não encontrei" sem fontes mostra só o guardrail', () => {
+    expect(
+      presentTurn({ answer: NOT_FOUND_MESSAGE, scope: 'in_scope', sources: [] }).steps,
+    ).toEqual([GUARDRAIL_DONE]);
+  });
+
+  it('resposta sem fontes mostra só o guardrail', () => {
+    expect(presentTurn({ answer: 'Olá.', scope: 'in_scope', sources: [] }).steps).toEqual([
+      GUARDRAIL_DONE,
+    ]);
   });
 });
