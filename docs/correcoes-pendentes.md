@@ -114,7 +114,10 @@ eval na `main` e comparar (o campo `marker` não altera respostas nem o critéri
 
 ## COR-05: trecho do cartão de documento mostra o markdown cru
 
-**Status:** pendente (encontrada em 2026-10-26, roteiro da interface web, item 1).
+**Status:** resolvida em 2026-10-26: `snippet_of` em `tools/document_search.py` tira títulos,
+marcadores de citação e de lista, links e ênfases antes de cortar o trecho; o eval de
+fundamentação usa a mesma função. Conversas gravadas antes guardam o trecho antigo. Encontrada
+no roteiro da interface web, item 1.
 
 **Sintoma.** O `excerpt` das fontes `document` vem do chunk do `.md` com os marcadores de título
 e de citação (`# Come-cotas > Material educativo … ## O que é`), e o `SourceCard` o mostra como

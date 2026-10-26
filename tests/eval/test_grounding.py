@@ -17,9 +17,8 @@ from fastapi.testclient import TestClient
 
 from financial_agent.api.app import create_app
 from financial_agent.graph.nodes.agent import cited_markers
-from financial_agent.logging import truncate
 from financial_agent.rag.ingest import load_directory, split_documents
-from financial_agent.tools.document_search import SNIPPET_MAX_CHARS
+from financial_agent.tools.document_search import snippet_of
 from tests.eval.common import (
     DOCS_DIR,
     OUT_DIR,
@@ -68,8 +67,7 @@ def chunk_texts() -> dict[tuple[str, str], str]:
     """(source, snippet) → texto completo do trecho, reconstruído a partir de `data/docs/`."""
     texts = {}
     for chunk in split_documents(load_directory(DOCS_DIR)):
-        snippet = truncate(" ".join(chunk.page_content.split()), SNIPPET_MAX_CHARS)
-        texts[(chunk.metadata["source"], snippet)] = chunk.page_content
+        texts[(chunk.metadata["source"], snippet_of(chunk.page_content))] = chunk.page_content
     return texts
 
 
