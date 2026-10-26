@@ -111,3 +111,35 @@ vazio.
 
 **Pendente junto.** Confirmar que os 88,5% são oscilação do LLM e não regressão: rodar o mesmo
 eval na `main` e comparar (o campo `marker` não altera respostas nem o critério de acerto).
+
+## COR-05: trecho do cartão de documento mostra o markdown cru
+
+**Status:** resolvida em 2026-10-26: `snippet_of` em `tools/document_search.py` tira títulos,
+marcadores de citação e de lista, links e ênfases antes de cortar o trecho; o eval de
+fundamentação usa a mesma função. Conversas gravadas antes guardam o trecho antigo. Encontrada
+no roteiro da interface web, item 1.
+
+**Sintoma.** O `excerpt` das fontes `document` vem do chunk do `.md` com os marcadores de título
+e de citação (`# Come-cotas > Material educativo … ## O que é`), e o `SourceCard` o mostra como
+texto. A leitura fica truncada no meio do cabeçalho do documento em vez de começar no conteúdo.
+
+**Correção proposta.** Limpar o markdown no backend ao montar o `excerpt` (remover `#`, `>` e
+quebras de linha de cabeçalho) ou, na ingestão, guardar o texto do chunk sem a sintaxe. Não
+reescrever no front: o trecho é a evidência da fonte.
+
+## COR-06: Nginx resolve o nome `api` só ao subir
+
+**Status:** resolvida em 2026-10-26 (`resolver 127.0.0.11` e `proxy_pass` com variável em
+`frontend/nginx/default.conf.template`; testado recriando a API com outro IP sem reiniciar o
+`web`). Encontrada no roteiro da interface web, item 8.
+
+**Sintoma.** `proxy_pass ${API_UPSTREAM}` com um nome fixo é resolvido uma vez, na partida do
+Nginx. Um `docker compose stop/start api` manteve o IP e funcionou, mas se o container da API for
+recriado com outro IP (`up --build api`, `--force-recreate`), o `web` passa a responder 502/504
+até ser reiniciado.
+
+**Correção proposta.** Usar `resolver 127.0.0.11 valid=10s;` (DNS do Docker) e `proxy_pass` com
+variável (`set $upstream ${API_UPSTREAM};`), ajustando o `rewrite` de `/api/v1/` e `/api/health`,
+já que `proxy_pass` com variável não troca o prefixo da URI. Alternativa simples: documentar que
+o `web` deve ser reiniciado junto com a API.
+

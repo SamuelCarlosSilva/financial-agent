@@ -15,7 +15,7 @@ from financial_agent.graph.builder import build_graph
 from financial_agent.graph.prompts import NOT_FOUND_MESSAGE
 from financial_agent.graph.state import DocumentSource
 from financial_agent.tools import get_tools
-from financial_agent.tools.document_search import NO_RESULTS, make_search_tool
+from financial_agent.tools.document_search import NO_RESULTS, make_search_tool, snippet_of
 from tests.fakes import fake_llm
 from tests.unit.test_chat_log import usage
 
@@ -84,6 +84,32 @@ async def test_returns_numbered_chunks_above_threshold() -> None:
     assert len(first.snippet) <= 300
     assert first.snippet.startswith("Come-cotas é a antecipação")
     assert second.page == 3
+
+
+def test_snippet_drops_markdown_syntax() -> None:
+    chunk = (
+        "# Come-cotas\n\n"
+        "> Material educativo de exemplo.\n> Não substitui a legislação.\n\n"
+        "## O que é\n\n"
+        "**Come-cotas** é a antecipação do `IR`, ver [Receita](https://example.com).\n"
+        "- 15% no longo prazo;\n1. 20% no curto prazo."
+    )
+
+    assert snippet_of(chunk) == (
+        "Material educativo de exemplo. Não substitui a legislação. Come-cotas é a antecipação "
+        "do IR, ver Receita. 15% no longo prazo; 20% no curto prazo."
+    )
+
+
+def test_snippet_keeps_numbers_and_underscores_and_is_truncated() -> None:
+    assert snippet_of("Alíquota de 22,5% * 2 em fundo_curto.") == (
+        "Alíquota de 22,5% * 2 em fundo_curto."
+    )
+    assert len(snippet_of("## Título\n" + "palavra " * 100)) <= 300
+
+
+def test_snippet_of_a_chunk_with_only_headings_keeps_their_text() -> None:
+    assert snippet_of("# Come-cotas\n## Ajuste no resgate") == "Come-cotas Ajuste no resgate"
 
 
 async def test_score_equal_to_threshold_is_kept() -> None:

@@ -15,12 +15,41 @@ diz que não encontrou em vez de inventar.
 > recomendação garantido no código e tipos registrados no checkpointer. Pendências conhecidas no
 > [roadmap](#roadmap).
 
+## Capturas
+
+<table>
+  <tr>
+    <td><img src="docs/images/resposta-documentos.png" alt="Resposta sobre come-cotas com marcadores [1] e [2] ligados a cartões de documento, tema claro"></td>
+    <td><img src="docs/images/cotacao-calculo.png" alt="Conversão de 500 euros com cartões de cotação e de cálculo e os passos do agente, tema escuro"></td>
+  </tr>
+  <tr>
+    <td align="center">Resposta fundamentada: cada <code>[n]</code> leva ao cartão da fonte</td>
+    <td align="center">Cotação em tempo real e cálculo, com os passos do agente</td>
+  </tr>
+</table>
+
+<details>
+<summary>Mais capturas: aviso de recomendação, recusa e erro</summary>
+
+| | |
+|---|---|
+| ![Resposta com cotação do dólar e aviso de que não é recomendação de investimento](docs/images/avisos.png) | ![Pergunta fora de escopo recusada com aviso neutro, tema escuro](docs/images/recusa.png) |
+| Aviso de não recomendação separado da resposta | Pergunta fora de finanças recusada |
+| ![Banner de serviço indisponível com o botão Tentar de novo](docs/images/erro.png) | |
+| Falha técnica com "Tentar de novo" | |
+
+</details>
+
+Capturas feitas com a API real (`gpt-4o-mini`) e a interface em http://localhost:8080.
+
 ## Sumário
 
+- [Capturas](#capturas)
 - [Status](#status)
 - [Arquitetura](#arquitetura)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Como rodar](#como-rodar)
+- [Interface web](#interface-web)
 - [Uso da API](#uso-da-api)
 - [Configuração](#configuração)
 - [Retenção das conversas](#retenção-das-conversas)
@@ -42,6 +71,10 @@ diz que não encontrou em vez de inventar.
 
 Especificação completa em [`specs/001-financial-assistant-api/spec.md`](specs/001-financial-assistant-api/spec.md)
 e o andamento tarefa a tarefa em [`tasks.md`](specs/001-financial-assistant-api/tasks.md).
+
+A [interface web](#interface-web) (feature 002) tem as cinco histórias prontas (resposta com
+fontes, avisos de escopo, conversas anteriores, falhas técnicas e passos do agente); o andamento
+está em [`specs/002-web-chat-frontend/tasks.md`](specs/002-web-chat-frontend/tasks.md).
 
 ## Arquitetura
 
@@ -144,6 +177,7 @@ tests/
 ├── contract/      # respostas validadas contra o OpenAPI
 ├── integration/   # Postgres + pgvector reais via testcontainers
 └── eval/          # avaliações com o LLM real e juiz LLM
+frontend/          # interface web (React + Vite), servida por Nginx em produção
 data/docs/         # documentos de exemplo em pt-BR
 specs/             # especificação, plano, contratos e tarefas (spec-kit)
 ```
@@ -158,6 +192,10 @@ O roteiro completo, com os 12 cenários de validação manual, está em
 - Docker e Docker Compose
 - Python 3.12 e [uv](https://docs.astral.sh/uv/)
 - Uma chave `OPENAI_API_KEY`
+
+> **Custo:** o projeto usa a sua chave da OpenAI. Cada pergunta faz algumas chamadas ao modelo
+> (guardrail, agente e verificação de fundamentação), e os evals (`pytest -m eval`) rodam
+> centenas de perguntas. Defina um limite de gasto no painel da OpenAI antes de rodar.
 
 ### Localmente
 
@@ -179,10 +217,89 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Sobem o banco, a API (`http://localhost:8000`) e a [interface web](#interface-web)
+(`http://localhost:8080`).
+
 A ingestão continua sendo feita a partir do host (o banco fica exposto em `localhost:5432`):
 
 ```bash
 uv run python -m financial_agent.rag.ingest data/docs/
+```
+
+## Interface web
+
+Uma interface de conversa em `frontend/` (React 18 + TypeScript, Vite) mostra as respostas com
+os marcadores `[n]` ligados aos cartões de fonte (documento, cotação, cálculo), os avisos de
+escopo, os passos do agente e a lista de conversas deste navegador. O visual vem do design
+system "Financial Agent" do Claude Design
+([artifact](https://claude.ai/artifact/9KXgDg2ja51F2QTxbpNozU), versão `1792443906-b50c`).
+A especificação está em [`specs/002-web-chat-frontend/`](specs/002-web-chat-frontend/), e há
+[capturas](#capturas) no topo deste README.
+
+### Com Docker
+
+```bash
+docker compose up --build        # http://localhost:8080
+```
+
+O serviço `web` é um Nginx sem root que serve o bundle e faz o proxy de `/api` para a API
+([contrato](specs/002-web-chat-frontend/contracts/proxy.md)): `/api/health` → `/health`,
+`/api/v1/*` → `/v1/*` com a chave da API, e qualquer outro `/api/*` responde 404.
+
+### Em desenvolvimento
+
+```bash
+cd frontend
+cp .env.example .env.local       # API_UPSTREAM e FINAGENT_API_KEY
+npm ci
+npm run dev                      # http://localhost:5173, proxy /api → API local
+```
+
+Requer Node.js 22. O proxy do Vite (em `dev` e em `preview`) segue o mesmo contrato do Nginx.
+
+### Variáveis
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `API_UPSTREAM` | `http://api:8000` (compose), `http://localhost:8000` (dev) | Endereço da API, sem barra final |
+| `FINAGENT_API_KEY` | vazia | Chave enviada pelo proxy em `X-API-Key`. Deve ser uma das `API_KEYS`; vazia, nenhum cabeçalho é enviado |
+
+As duas são lidas só pelo servidor (Nginx ou Vite) e **não** levam o prefixo `VITE_`: o Vite
+coloca no bundle tudo o que começa com `VITE_`, e a chave apareceria para qualquer visitante. No
+compose, `FINAGENT_API_KEY` vem do `.env` da raiz. O CI faz o build com uma chave-sentinela e
+falha se ela aparecer em `dist/`.
+
+### Estrutura
+
+```text
+frontend/
+├── src/
+│   ├── api/            # cliente HTTP, tipos e mensagens fixas da API
+│   ├── design-system/  # tokens, fontes e componentes portados do design system
+│   ├── features/chat/  # conversa: hook, apresentação do turno, citações, passos
+│   ├── features/threads/ # lista de conversas no localStorage
+│   └── lib/            # formatação de números e datas (pt-BR)
+├── e2e/                # Playwright com a API simulada, axe e teclado
+├── nginx/              # configuração do proxy de produção
+└── Dockerfile
+```
+
+### Checagens
+
+```bash
+cd frontend
+npm run lint && npm run format:check && npm run typecheck
+npm test                                         # Vitest
+npm run test:coverage                            # Vitest com cobertura (relatório em reports/coverage/)
+npx playwright install chromium && npm run e2e   # E2E com API simulada, axe (temas claro e escuro) e teclado
+```
+
+O proxy Nginx tem um smoke test próprio, que sobe a imagem `web` com uma API falsa e confere
+rotas, injeção da chave, cabeçalhos de segurança, cache e a re-resolução do nome da API (requer
+Docker e `jq`):
+
+```bash
+docker build -t finagent-web:smoke frontend && scripts/proxy-smoke.sh finagent-web:smoke
 ```
 
 ## Uso da API
@@ -329,10 +446,19 @@ uv run python -m tests.eval.report                  # roda os evals e imprime a 
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy                                         # modo strict em src/
+
+uv run pytest -m "not eval" --cov                   # com cobertura (unitários + integração)
 ```
 
 Um `uv run pytest` sem filtros roda unitários, contrato e integração (requer Docker) e exclui
 os testes marcados com `eval`.
+
+**Cobertura** (medida em 2026-10-26, com ramificações):
+
+| Parte | Cobertura | Piso no CI | Observação |
+|---|---|---|---|
+| Backend (unitários + integração) | 92% | 90% | `fail_under` no `pyproject.toml` |
+| Front (Vitest) | 53% das linhas | 50% | Lógica (`presentTurn`, `client`, `format`, citações) a 100%; telas e componentes são cobertos pelos 32 testes E2E, que não entram nesta conta |
 
 **Avaliação de fundamentação** (`tests/eval/test_grounding.py`): roda 48 perguntas pela API real,
 26 respondíveis pelos documentos e 22 sem resposta na base, e usa um juiz LLM para verificar
@@ -387,8 +513,10 @@ com comandos prontos para validar a API à mão (documentos, escopo, cotação, 
 validação, autenticação, resiliência, logs e manutenção) e uma folha para registrar os resultados.
 
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em cada push na `main` e em cada
-pull request roda lint e tipos, testes unitários e de contrato, testes de integração e o build da
-imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
+pull request roda lint e tipos, testes unitários e de contrato, testes de integração, os jobs do
+front (lint, formatação, tipos, Vitest com cobertura, build sem a chave no bundle, E2E e
+acessibilidade), o build das imagens `api` e `web` e o smoke test do proxy na imagem `web`. Os
+percentuais de cobertura aparecem no resumo de cada execução. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
 `run_eval`), usando o secret `OPENAI_API_KEY`.
 
 ## Segurança
@@ -396,6 +524,9 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 - **Ative `API_KEYS` em qualquer ambiente que não seja local.** Sem chaves, a API fica aberta.
 - O `thread_id` é um identificador, não uma credencial: quem o conhece pode continuar a conversa
   e ler todo o histórico em `GET /v1/threads/{id}/messages`.
+- A interface web nunca vê a chave: o proxy (Nginx ou Vite) injeta `X-API-Key` só nas chamadas a
+  `/api/v1`, e o navegador fala apenas com a própria origem (sem fontes ou scripts de terceiros).
+  A política de conteúdo (CSP) do Nginx bloqueia qualquer outra origem.
 - O `.env` nunca deve ser versionado; use o `.env.example` como modelo.
 - Os logs são JSON estruturado, com `request_id` por requisição. O evento `chat_turn` registra a
   decisão do guardrail, as ferramentas chamadas, as fontes (tipo e identificador), a latência e

@@ -1,6 +1,7 @@
 """Ferramenta de busca na base de documentos financeiros (RAG), contracts/tools.md."""
 
 import inspect
+import re
 import warnings
 from typing import Annotated, Any
 
@@ -19,6 +20,11 @@ from financial_agent.logging import truncate
 TOOL_NAME = "search_financial_documents"
 NO_RESULTS = "NENHUM_RESULTADO_RELEVANTE"
 SNIPPET_MAX_CHARS = 300
+
+_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+(.*)$")
+_LINE_PREFIX = re.compile(r"^\s*(?:>\s?)+|^\s*(?:[-*+]|\d+[.)])\s+")
+_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_EMPHASIS = re.compile(r"\*\*|__|`")
 
 # A similaridade de cosseno pode ser negativa para textos sem relação; o limiar já os descarta.
 warnings.filterwarnings("ignore", message="Relevance scores must be between 0 and 1")
@@ -53,9 +59,26 @@ def _first_index(state: dict[str, Any] | None, query: str, top_k: int) -> int:
     return position * top_k + 1
 
 
+def snippet_of(text: str) -> str:
+    """Trecho do cartão de fonte: o chunk em texto corrido, sem a sintaxe do markdown.
+
+    Títulos saem (o cartão já mostra o título do documento), e marcadores de citação e de
+    lista, links e ênfases viram texto simples. Um chunk só de títulos fica com o texto deles.
+    """
+    lines, headings = [], []
+    for line in text.splitlines():
+        heading = _HEADING.match(line)
+        if heading:
+            headings.append(heading.group(1))
+            continue
+        lines.append(_LINE_PREFIX.sub("", line))
+    plain = _EMPHASIS.sub("", _LINK.sub(r"\1", " ".join(lines or headings)))
+    return truncate(" ".join(plain.split()), SNIPPET_MAX_CHARS)
+
+
 def _to_source(document: Document, score: float) -> DocumentSource:
     metadata = document.metadata
-    snippet = truncate(" ".join(document.page_content.split()), SNIPPET_MAX_CHARS)
+    snippet = snippet_of(document.page_content)
     return DocumentSource(
         document_id=metadata.get("document_id", ""),
         title=metadata.get("title") or metadata.get("source", ""),
