@@ -44,9 +44,16 @@ jobs:
       - run: uv python install 3.12
       - run: uv sync --frozen
       - name: Unitários e contrato
-        run: uv run pytest -m "not eval and not integration" --junitxml=reports/unit.xml
+        run: uv run pytest -m "not eval and not integration" --junitxml=reports/unit.xml --cov --cov-report=
       - name: Integração (Postgres + pgvector via testcontainers)
-        run: uv run pytest -m integration --junitxml=reports/integration.xml
+        run: >-
+          uv run pytest -m integration --junitxml=reports/integration.xml
+          --cov --cov-append --cov-report=xml:reports/coverage.xml
+      - name: Cobertura (unitários + integração)
+        # Aplica o fail_under do pyproject sobre as duas execuções somadas. `shell: bash` liga o
+        # pipefail, senão o tee esconderia a falha.
+        shell: bash
+        run: uv run coverage report --format=markdown | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -70,9 +77,18 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
         env:
           CI: true
+      - name: Resumo da cobertura
+        run: |
+          node -e '
+            const t = require("./reports/coverage/coverage-summary.json").total;
+            const row = (k, n) => `| ${n} | ${t[k].pct}% | ${t[k].covered}/${t[k].total} |`;
+            console.log(["### Cobertura do front (Vitest)", "", "| Métrica | % | Cobertos |", "|---|---|---|",
+              row("statements", "Statements"), row("branches", "Branches"),
+              row("functions", "Functions"), row("lines", "Lines")].join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
       - name: Build sem vazar a chave no bundle
         # Não use `! grep`: o bash ignora o errexit em comandos negados.
         run: |
@@ -128,8 +144,13 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: false
+          load: true
+          tags: finagent-${{ matrix.name }}:ci
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Smoke do proxy Nginx (rotas, chave, cabeçalhos e re-resolução da API)
+        if: matrix.name == 'web'
+        run: scripts/proxy-smoke.sh finagent-web:ci
 
   eval:
     name: Avaliação com LLM real
