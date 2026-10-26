@@ -15,8 +15,36 @@ diz que não encontrou em vez de inventar.
 > recomendação garantido no código e tipos registrados no checkpointer. Pendências conhecidas no
 > [roadmap](#roadmap).
 
+## Capturas
+
+<table>
+  <tr>
+    <td><img src="docs/images/resposta-documentos.png" alt="Resposta sobre come-cotas com marcadores [1] e [2] ligados a cartões de documento, tema claro"></td>
+    <td><img src="docs/images/cotacao-calculo.png" alt="Conversão de 500 euros com cartões de cotação e de cálculo e os passos do agente, tema escuro"></td>
+  </tr>
+  <tr>
+    <td align="center">Resposta fundamentada: cada <code>[n]</code> leva ao cartão da fonte</td>
+    <td align="center">Cotação em tempo real e cálculo, com os passos do agente</td>
+  </tr>
+</table>
+
+<details>
+<summary>Mais capturas: aviso de recomendação, recusa e erro</summary>
+
+| | |
+|---|---|
+| ![Resposta com cotação do dólar e aviso de que não é recomendação de investimento](docs/images/avisos.png) | ![Pergunta fora de escopo recusada com aviso neutro, tema escuro](docs/images/recusa.png) |
+| Aviso de não recomendação separado da resposta | Pergunta fora de finanças recusada |
+| ![Banner de serviço indisponível com o botão Tentar de novo](docs/images/erro.png) | |
+| Falha técnica com "Tentar de novo" | |
+
+</details>
+
+Capturas feitas com a API real (`gpt-4o-mini`) e a interface em http://localhost:8080.
+
 ## Sumário
 
+- [Capturas](#capturas)
 - [Status](#status)
 - [Arquitetura](#arquitetura)
 - [Estrutura do repositório](#estrutura-do-repositório)
@@ -165,6 +193,10 @@ O roteiro completo, com os 12 cenários de validação manual, está em
 - Python 3.12 e [uv](https://docs.astral.sh/uv/)
 - Uma chave `OPENAI_API_KEY`
 
+> **Custo:** o projeto usa a sua chave da OpenAI. Cada pergunta faz algumas chamadas ao modelo
+> (guardrail, agente e verificação de fundamentação), e os evals (`pytest -m eval`) rodam
+> centenas de perguntas. Defina um limite de gasto no painel da OpenAI antes de rodar.
+
 ### Localmente
 
 ```bash
@@ -201,7 +233,8 @@ os marcadores `[n]` ligados aos cartões de fonte (documento, cotação, cálcul
 escopo, os passos do agente e a lista de conversas deste navegador. O visual vem do design
 system "Financial Agent" do Claude Design
 ([artifact](https://claude.ai/artifact/9KXgDg2ja51F2QTxbpNozU), versão `1792443906-b50c`).
-A especificação está em [`specs/002-web-chat-frontend/`](specs/002-web-chat-frontend/).
+A especificação está em [`specs/002-web-chat-frontend/`](specs/002-web-chat-frontend/), e há
+[capturas](#capturas) no topo deste README.
 
 ### Com Docker
 
