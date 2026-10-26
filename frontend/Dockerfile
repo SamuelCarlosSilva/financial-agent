@@ -2,7 +2,7 @@
 # (o ENV FINAGENT_API_KEY abaixo é só um padrão vazio para o envsubst; a chave real vem do
 # ambiente do container, nunca da imagem)
 # Build do bundle estático
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
