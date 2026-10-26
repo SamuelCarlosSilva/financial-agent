@@ -1,0 +1,9 @@
+node_modules
+dist
+.env*
+playwright-report
+test-results
+reports
+# Os testes unitários importam os fixtures do E2E, e o build (tsc -b) checa os testes.
+e2e/*
+!e2e/fixtures
