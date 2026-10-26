@@ -1,3 +1,5 @@
+# As portas ficam só em 127.0.0.1: publicadas em 0.0.0.0, a API (sem chave por padrão) e o
+# banco ficariam acessíveis a qualquer um na mesma rede, e o Docker passa por cima do firewall.
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -6,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: financial_agent
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +26,7 @@ services:
       # dentro da rede do compose o banco é acessado pelo nome do serviço
       DATABASE_URL: postgresql://postgres:postgres@db:5432/financial_agent
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -35,7 +37,7 @@ services:
   web:
     build: ./frontend
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       API_UPSTREAM: http://api:8000
       FINAGENT_API_KEY: ${FINAGENT_API_KEY:-}
