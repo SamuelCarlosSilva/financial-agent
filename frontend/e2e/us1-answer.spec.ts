@@ -15,7 +15,7 @@ test('envia com Enter, bloqueia o duplo envio e mostra os documentos citados', a
   const log = page.getByRole('log');
   await expect(log.getByText('Como funciona o come-cotas?')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Respondendo…' })).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText('Verificando o escopo da pergunta');
+  await expect(page.getByRole('log').locator('.fa-tools')).toContainText('Verificando o escopo');
 
   // Enquanto a resposta não chega, um segundo Enter não envia nada.
   await input.fill('Outra pergunta');

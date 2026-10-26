@@ -38,3 +38,37 @@
   margin: 0;
   color: var(--ink-muted);
 }
+
+.chat-steps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.chat-steps-toggle {
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.chat-steps-toggle::after {
+  content: ' ▾';
+}
+
+.chat-steps-toggle[aria-expanded='false']::after {
+  content: ' ▸';
+}
+
+.chat-steps-toggle:hover {
+  color: var(--ink);
+}

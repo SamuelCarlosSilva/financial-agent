@@ -38,3 +38,6 @@ frontend/.env.local
 frontend/playwright-report/
 frontend/test-results/
 frontend/reports/
+
+# Notas locais
+docs/backlog.md
