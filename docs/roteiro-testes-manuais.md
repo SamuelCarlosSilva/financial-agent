@@ -30,6 +30,7 @@ o requisito que valida.
   - [PERF: tempo de resposta (opcional)](#perf-tempo-de-resposta-opcional)
 - [4. Folha de resultados](#4-folha-de-resultados)
 - [5. Problemas conhecidos](#5-problemas-conhecidos)
+- [6. Interface web](#6-interface-web)
 
 ## 1. Como usar
 
@@ -437,3 +438,51 @@ Se aparecerem, marque ⚠️ e cite este item em vez de abrir um bug novo.
 - **Aviso de recomendação (ADV-03)**: em perguntas sobre comprar ou vender moeda, o modelo já
   omitiu o aviso. O grafo agora tem o nó `add_advice_disclaimer` para garantir o aviso, então uma
   ausência aqui é regressão.
+
+## 6. Interface web
+
+Validação da interface web (feature 002) pelo
+[quickstart](../specs/002-web-chat-frontend/quickstart.md), §1 a §4, com a API real.
+
+**Data**: 2026-10-26 **Branch/commit**: `002-phase8-polish` @ `73db5fe` **Ambiente**:
+`docker compose up --build -d db api web` (Chrome, tema escuro do SO), com `API_KEYS=chave-local`
+num override do compose e `FINAGENT_API_KEY=chave-local` **Modelo**: `gpt-4o-mini`
+
+### Checagens automáticas e do proxy (§1 e §3)
+
+| Checagem | Resultado |
+|---|---|
+| `npm run lint`, `format:check`, `typecheck` | ✅ |
+| `npm test` (Vitest) | ✅ 91 testes |
+| `npm run e2e` (Playwright, axe nos dois temas, teclado, segurança) | ✅ 32 testes |
+| Build com chave-sentinela; `grep` em `dist/` | ✅ sentinela ausente |
+| JS inicial (gzip), meta ≤ 200 kB | ✅ 53,86 kB (`index-*.js`, 164,14 kB sem compressão); CSS 4,59 kB |
+| `uv run pytest -m "not eval and not integration"` | ✅ 141 testes |
+| `curl http://localhost:8080/api/health` | ✅ `{"status":"ok","database":"ok"}` |
+| `curl -i http://localhost:8080/api/docs` | ✅ 404 com o corpo JSON do contrato |
+| Chave injetada pelo proxy | ✅ `/v1/threads/{id}/messages` direto na 8000 sem chave → 401; pela 8080 → 404 (passou da autenticação) |
+| Cabeçalhos de `/` e `/assets/*` | ✅ CSP, `nosniff`, `no-referrer`; `no-cache` no HTML e `immutable` nos assets |
+
+### Roteiro manual (§4)
+
+| # | Ação | Status | Observação |
+|---|---|---|---|
+| 1 | "O que é come-cotas?" | ✅ | "Verificando o escopo" durante a espera; `[1]` e `[2]` clicáveis; dois cartões de documento; clicar `[2]` destaca o cartão. O trecho do cartão mostra o markdown cru (`# Come-cotas > …`), ver COR-05 |
+| 2 | "Quanto são 500 euros em reais?" | ✅ | Cartão de cotação (compra 6,045 destacada, venda 6,047, horário de Brasília) e de cálculo (3.022,50); passos escopo → cotação → cálculo → fundamentação. O texto do LLM usa ponto decimal ("6.045") e é mostrado como veio (FR-009) |
+| 3 | "Me dá uma receita de bolo" | ✅ | Aviso neutro "Fora do escopo financeiro", sem cartões, texto igual a `OUT_OF_SCOPE_MESSAGE` |
+| 4 | "Qual o melhor banco?" | ✅ | Aviso âmbar "Preciso de um esclarecimento" |
+| 5 | "Devo comprar dólar agora?" | ✅ | Resposta com cotação USD-BRL e aviso "Não é recomendação de investimento" separado abaixo |
+| 6 | "Qual a alíquota do IOF em operações de câmbio com cartão de crédito?" | ✅ | Aviso "Não encontrei nas fontes" |
+| 7 | Recarregar e abrir a conversa 1 pela lista | ✅ | Histórico e cartões voltam; "E em quais meses ele é cobrado?" continua o mesmo `thread_id` e cita o documento |
+| 8 | `docker compose stop api` e perguntar | ✅ | "504 · Serviço indisponível no momento" com "Tentar de novo" (o Nginx esgota o `proxy_connect_timeout` de 5 s). Depois de `docker compose start api`, o retry respondeu na mesma conversa. Ver COR-06 |
+| 9 | `web` com `FINAGENT_API_KEY` errada | ✅ | "401 · Chave de acesso ausente ou inválida", mensagem de autorização e `request_id`, sem "Tentar de novo" |
+| 10 | Requisições da página | ✅ | 12 requisições num recarregamento, todas para `localhost:8080` (HTML, JS, CSS, 6 fontes, `/api/health`, histórico, favicon); nenhum erro de CSP no console. A ausência de `X-API-Key` nas requisições é verificada pelo `e2e/security.spec.ts` |
+| 11 | Só teclado; tema do SO | ✅ | Tab/Shift+Tab/Enter na lista de conversas e em "Nova conversa", com contorno de foco visível. O fluxo completo (enviar, `[n]`, lista, nova conversa, retry) e o axe nos temas claro e escuro estão em `e2e/a11y.spec.ts`; à mão só o tema escuro foi visto |
+| 12 | 4.001 caracteres; Enter duplo | ✅ | "4.001 / 4.000" e "A mensagem passa do limite de 4.000 caracteres.", com "Enviar" desativado; Enter duplo gerou um único `POST /api/v1/chat` |
+
+### Observações
+
+- O tempo de resposta ficou entre 10 e 20 s nas perguntas com ferramentas; o indicador de passos
+  fica visível durante toda a espera.
+- `/favicon.ico` cai no fallback da SPA e volta `index.html` com 200; o navegador ignora.
+
