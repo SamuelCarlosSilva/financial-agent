@@ -21,6 +21,7 @@ diz que não encontrou em vez de inventar.
 - [Arquitetura](#arquitetura)
 - [Estrutura do repositório](#estrutura-do-repositório)
 - [Como rodar](#como-rodar)
+- [Interface web](#interface-web)
 - [Uso da API](#uso-da-api)
 - [Configuração](#configuração)
 - [Retenção das conversas](#retenção-das-conversas)
@@ -42,6 +43,10 @@ diz que não encontrou em vez de inventar.
 
 Especificação completa em [`specs/001-financial-assistant-api/spec.md`](specs/001-financial-assistant-api/spec.md)
 e o andamento tarefa a tarefa em [`tasks.md`](specs/001-financial-assistant-api/tasks.md).
+
+A [interface web](#interface-web) (feature 002) tem as cinco histórias prontas (resposta com
+fontes, avisos de escopo, conversas anteriores, falhas técnicas e passos do agente); o andamento
+está em [`specs/002-web-chat-frontend/tasks.md`](specs/002-web-chat-frontend/tasks.md).
 
 ## Arquitetura
 
@@ -144,6 +149,7 @@ tests/
 ├── contract/      # respostas validadas contra o OpenAPI
 ├── integration/   # Postgres + pgvector reais via testcontainers
 └── eval/          # avaliações com o LLM real e juiz LLM
+frontend/          # interface web (React + Vite), servida por Nginx em produção
 data/docs/         # documentos de exemplo em pt-BR
 specs/             # especificação, plano, contratos e tarefas (spec-kit)
 ```
@@ -179,10 +185,79 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Sobem o banco, a API (`http://localhost:8000`) e a [interface web](#interface-web)
+(`http://localhost:8080`).
+
 A ingestão continua sendo feita a partir do host (o banco fica exposto em `localhost:5432`):
 
 ```bash
 uv run python -m financial_agent.rag.ingest data/docs/
+```
+
+## Interface web
+
+Uma interface de conversa em `frontend/` (React 18 + TypeScript, Vite) mostra as respostas com
+os marcadores `[n]` ligados aos cartões de fonte (documento, cotação, cálculo), os avisos de
+escopo, os passos do agente e a lista de conversas deste navegador. O visual vem do design
+system "Financial Agent" do Claude Design
+([artifact](https://claude.ai/artifact/9KXgDg2ja51F2QTxbpNozU), versão `1792443906-b50c`).
+A especificação está em [`specs/002-web-chat-frontend/`](specs/002-web-chat-frontend/).
+
+### Com Docker
+
+```bash
+docker compose up --build        # http://localhost:8080
+```
+
+O serviço `web` é um Nginx sem root que serve o bundle e faz o proxy de `/api` para a API
+([contrato](specs/002-web-chat-frontend/contracts/proxy.md)): `/api/health` → `/health`,
+`/api/v1/*` → `/v1/*` com a chave da API, e qualquer outro `/api/*` responde 404.
+
+### Em desenvolvimento
+
+```bash
+cd frontend
+cp .env.example .env.local       # API_UPSTREAM e FINAGENT_API_KEY
+npm ci
+npm run dev                      # http://localhost:5173, proxy /api → API local
+```
+
+Requer Node.js 22. O proxy do Vite (em `dev` e em `preview`) segue o mesmo contrato do Nginx.
+
+### Variáveis
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `API_UPSTREAM` | `http://api:8000` (compose), `http://localhost:8000` (dev) | Endereço da API, sem barra final |
+| `FINAGENT_API_KEY` | vazia | Chave enviada pelo proxy em `X-API-Key`. Deve ser uma das `API_KEYS`; vazia, nenhum cabeçalho é enviado |
+
+As duas são lidas só pelo servidor (Nginx ou Vite) e **não** levam o prefixo `VITE_`: o Vite
+coloca no bundle tudo o que começa com `VITE_`, e a chave apareceria para qualquer visitante. No
+compose, `FINAGENT_API_KEY` vem do `.env` da raiz. O CI faz o build com uma chave-sentinela e
+falha se ela aparecer em `dist/`.
+
+### Estrutura
+
+```text
+frontend/
+├── src/
+│   ├── api/            # cliente HTTP, tipos e mensagens fixas da API
+│   ├── design-system/  # tokens, fontes e componentes portados do design system
+│   ├── features/chat/  # conversa: hook, apresentação do turno, citações, passos
+│   ├── features/threads/ # lista de conversas no localStorage
+│   └── lib/            # formatação de números e datas (pt-BR)
+├── e2e/                # Playwright com a API simulada, axe e teclado
+├── nginx/              # configuração do proxy de produção
+└── Dockerfile
+```
+
+### Checagens
+
+```bash
+cd frontend
+npm run lint && npm run format:check && npm run typecheck
+npm test                                         # Vitest
+npx playwright install chromium && npm run e2e   # E2E com API simulada, axe (temas claro e escuro) e teclado
 ```
 
 ## Uso da API
@@ -387,8 +462,9 @@ com comandos prontos para validar a API à mão (documentos, escopo, cotação, 
 validação, autenticação, resiliência, logs e manutenção) e uma folha para registrar os resultados.
 
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em cada push na `main` e em cada
-pull request roda lint e tipos, testes unitários e de contrato, testes de integração e o build da
-imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
+pull request roda lint e tipos, testes unitários e de contrato, testes de integração, os jobs do
+front (lint, formatação, tipos, Vitest, build sem a chave no bundle, E2E e acessibilidade) e o
+build das imagens `api` e `web`. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
 `run_eval`), usando o secret `OPENAI_API_KEY`.
 
 ## Segurança
@@ -396,6 +472,9 @@ imagem Docker. A avaliação com o LLM real roda só sob demanda (`workflow_disp
 - **Ative `API_KEYS` em qualquer ambiente que não seja local.** Sem chaves, a API fica aberta.
 - O `thread_id` é um identificador, não uma credencial: quem o conhece pode continuar a conversa
   e ler todo o histórico em `GET /v1/threads/{id}/messages`.
+- A interface web nunca vê a chave: o proxy (Nginx ou Vite) injeta `X-API-Key` só nas chamadas a
+  `/api/v1`, e o navegador fala apenas com a própria origem (sem fontes ou scripts de terceiros).
+  A política de conteúdo (CSP) do Nginx bloqueia qualquer outra origem.
 - O `.env` nunca deve ser versionado; use o `.env.example` como modelo.
 - Os logs são JSON estruturado, com `request_id` por requisição. O evento `chat_turn` registra a
   decisão do guardrail, as ferramentas chamadas, as fontes (tipo e identificador), a latência e
