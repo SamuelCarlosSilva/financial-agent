@@ -126,7 +126,9 @@ reescrever no front: o trecho é a evidência da fonte.
 
 ## COR-06: Nginx resolve o nome `api` só ao subir
 
-**Status:** pendente (encontrada em 2026-10-26, roteiro da interface web, item 8).
+**Status:** resolvida em 2026-10-26 (`resolver 127.0.0.11` e `proxy_pass` com variável em
+`frontend/nginx/default.conf.template`; testado recriando a API com outro IP sem reiniciar o
+`web`). Encontrada no roteiro da interface web, item 8.
 
 **Sintoma.** `proxy_pass ${API_UPSTREAM}` com um nome fixo é resolvido uma vez, na partida do
 Nginx. Um `docker compose stop/start api` manteve o IP e funcionou, mas se o container da API for

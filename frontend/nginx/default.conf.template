@@ -1,6 +1,11 @@
 # Proxy de produção do front (contracts/proxy.md). As variáveis ${API_UPSTREAM} e
 # ${FINAGENT_API_KEY} são preenchidas pelo envsubst da imagem ao subir o container; a chave
 # fica só aqui no servidor e nunca chega ao navegador.
+#
+# O upstream vai numa variável para o Nginx resolver o nome de novo a cada 10 s pelo DNS do
+# Docker: com o nome fixo no proxy_pass, ele só resolve ao subir, e recriar o container da API
+# (novo IP) derrubava o proxy até reiniciar o web. Com variável, o proxy_pass não troca o
+# prefixo da URI, por isso cada location reescreve o caminho com rewrite.
 server {
     listen 8080;
     server_name _;
@@ -14,8 +19,12 @@ server {
 
     include /etc/nginx/snippets/security-headers.conf;
 
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $api_upstream ${API_UPSTREAM};
+
     location = /api/health {
-        proxy_pass ${API_UPSTREAM}/health;
+        rewrite ^ /health break;
+        proxy_pass $api_upstream;
         # A saúde não usa chave: descarta qualquer uma que venha do cliente.
         proxy_set_header X-API-Key "";
         proxy_set_header X-Request-ID $http_x_request_id;
@@ -25,7 +34,8 @@ server {
     }
 
     location /api/v1/ {
-        proxy_pass ${API_UPSTREAM}/v1/;
+        rewrite ^/api(/v1/.*)$ $1 break;
+        proxy_pass $api_upstream;
         # Sempre a chave do proxy, sobrescrevendo a do cliente. Vazia: o cabeçalho não é enviado.
         proxy_set_header X-API-Key "${FINAGENT_API_KEY}";
         proxy_set_header X-Request-ID $http_x_request_id;
