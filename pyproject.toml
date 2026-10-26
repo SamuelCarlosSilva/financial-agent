@@ -32,6 +32,7 @@ dev = [
     "jsonschema>=4.23",
     "pyyaml>=6.0",
     "types-pyyaml>=6.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [build-system]
@@ -51,6 +52,16 @@ markers = [
     "eval: avaliações com o LLM real (custam tokens; rodar com -m eval)",
     "integration: testes que exigem Docker/Postgres (testcontainers)",
 ]
+
+[tool.coverage.run]
+source = ["financial_agent"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Unitários + integração somavam 92% quando o limite foi definido; o CI falha se cair abaixo.
+fail_under = 90
 
 [tool.ruff]
 line-length = 100

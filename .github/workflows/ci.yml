@@ -43,12 +43,16 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv sync --frozen
+      # O piso de cobertura (fail_under) vale só para a soma das duas execuções, no passo
+      # "Cobertura"; sozinhos, os unitários ficam abaixo dele.
       - name: Unitários e contrato
-        run: uv run pytest -m "not eval and not integration" --junitxml=reports/unit.xml --cov --cov-report=
+        run: >-
+          uv run pytest -m "not eval and not integration" --junitxml=reports/unit.xml
+          --cov --cov-report= --cov-fail-under=0
       - name: Integração (Postgres + pgvector via testcontainers)
         run: >-
           uv run pytest -m integration --junitxml=reports/integration.xml
-          --cov --cov-append --cov-report=xml:reports/coverage.xml
+          --cov --cov-append --cov-report=xml:reports/coverage.xml --cov-fail-under=0
       - name: Cobertura (unitários + integração)
         # Aplica o fail_under do pyproject sobre as duas execuções somadas. `shell: bash` liga o
         # pipefail, senão o tee esconderia a falha.

@@ -290,7 +290,16 @@ frontend/
 cd frontend
 npm run lint && npm run format:check && npm run typecheck
 npm test                                         # Vitest
+npm run test:coverage                            # Vitest com cobertura (relatório em reports/coverage/)
 npx playwright install chromium && npm run e2e   # E2E com API simulada, axe (temas claro e escuro) e teclado
+```
+
+O proxy Nginx tem um smoke test próprio, que sobe a imagem `web` com uma API falsa e confere
+rotas, injeção da chave, cabeçalhos de segurança, cache e a re-resolução do nome da API (requer
+Docker e `jq`):
+
+```bash
+docker build -t finagent-web:smoke frontend && scripts/proxy-smoke.sh finagent-web:smoke
 ```
 
 ## Uso da API
@@ -437,10 +446,19 @@ uv run python -m tests.eval.report                  # roda os evals e imprime a 
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy                                         # modo strict em src/
+
+uv run pytest -m "not eval" --cov                   # com cobertura (unitários + integração)
 ```
 
 Um `uv run pytest` sem filtros roda unitários, contrato e integração (requer Docker) e exclui
 os testes marcados com `eval`.
+
+**Cobertura** (medida em 2026-10-26, com ramificações):
+
+| Parte | Cobertura | Piso no CI | Observação |
+|---|---|---|---|
+| Backend (unitários + integração) | 92% | 90% | `fail_under` no `pyproject.toml` |
+| Front (Vitest) | 53% das linhas | 50% | Lógica (`presentTurn`, `client`, `format`, citações) a 100%; telas e componentes são cobertos pelos 32 testes E2E, que não entram nesta conta |
 
 **Avaliação de fundamentação** (`tests/eval/test_grounding.py`): roda 48 perguntas pela API real,
 26 respondíveis pelos documentos e 22 sem resposta na base, e usa um juiz LLM para verificar
@@ -496,8 +514,9 @@ validação, autenticação, resiliência, logs e manutenção) e uma folha para
 
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): em cada push na `main` e em cada
 pull request roda lint e tipos, testes unitários e de contrato, testes de integração, os jobs do
-front (lint, formatação, tipos, Vitest, build sem a chave no bundle, E2E e acessibilidade) e o
-build das imagens `api` e `web`. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
+front (lint, formatação, tipos, Vitest com cobertura, build sem a chave no bundle, E2E e
+acessibilidade), o build das imagens `api` e `web` e o smoke test do proxy na imagem `web`. Os
+percentuais de cobertura aparecem no resumo de cada execução. A avaliação com o LLM real roda só sob demanda (`workflow_dispatch` com
 `run_eval`), usando o secret `OPENAI_API_KEY`.
 
 ## Segurança

@@ -36,6 +36,22 @@ export default defineConfig(({ mode }) => {
       exclude: ['e2e/**', 'node_modules/**'],
       reporters: process.env.CI ? ['default', 'junit'] : ['default'],
       outputFile: { junit: 'reports/frontend-unit.xml' },
+      coverage: {
+        provider: 'v8',
+        include: ['src/**'],
+        exclude: [
+          'src/**/*.test.*',
+          'src/**/*.css',
+          'src/test/**',
+          'src/main.tsx',
+          'src/api/types.ts',
+        ],
+        reporter: ['text-summary', 'html', 'json-summary'],
+        reportsDirectory: 'reports/coverage',
+        // Piso medido quando a cobertura entrou no CI. Telas e componentes são exercitados pelo
+        // E2E (Playwright), que não entra nesta conta.
+        thresholds: { statements: 50, branches: 50, functions: 40, lines: 50 },
+      },
     },
   };
 });
