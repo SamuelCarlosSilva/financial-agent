@@ -37,6 +37,7 @@ pytestmark = pytest.mark.eval
 
 DATASET = Path(__file__).parent / "datasets" / "grounding.jsonl"
 FAILURES = OUT_DIR / "grounding_failures.jsonl"
+MISSES = OUT_DIR / "grounding_misses.jsonl"
 
 NOT_FOUND_MARKERS = (
     "nao encontrei",
@@ -62,6 +63,19 @@ def says_not_found(answer: str) -> bool:
 
 def document_sources(sources: list[dict[str, Any]]) -> list[str]:
     return [s["source"] for s in sources if s.get("type") == "document"]
+
+
+def miss_details(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Por que uma pergunta com resposta errou o acerto (SC-003); None quando acertou."""
+    missing = [f for f in row["expected_facts"] if not fact_present(f, row["answer"])]
+    source_cited = row["expected_source"] in document_sources(row["sources"])
+    if not missing and source_cited:
+        return None
+    return {
+        "missing_facts": missing,
+        "expected_source": row["expected_source"],
+        "source_cited": source_cited,
+    }
 
 
 def chunk_texts() -> dict[tuple[str, str], str]:
@@ -134,6 +148,17 @@ def results() -> Iterator[list[dict[str, Any]]]:
                     "unsupported_claims": [c.text for c in verdict.unsupported_claims],
                 }
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    with MISSES.open("w", encoding="utf-8") as out:
+        for row in answerable(rows):
+            details = miss_details(row)
+            if details is None:
+                continue
+            record = {"question": row["question"], "answer": row["answer"], **details}
+            record["sources"] = row["sources"]
+            if row.get("error"):
+                record["error"] = row["error"]
+            out.write(json.dumps(record, ensure_ascii=False) + "\n")
     yield rows
 
 
@@ -152,17 +177,13 @@ def test_all_requests_succeed(results: list[dict[str, Any]]) -> None:
 
 def test_answerable_questions_accuracy(results: list[dict[str, Any]]) -> None:
     rows = answerable(results)
-    misses = [
-        r["question"]
-        for r in rows
-        if not (
-            all(fact_present(f, r["answer"]) for f in r["expected_facts"])
-            and r["expected_source"] in document_sources(r["sources"])
-        )
-    ]
+    misses = [r["question"] for r in rows if miss_details(r) is not None]
     accuracy = 1 - len(misses) / len(rows)
     record_metric("sc003_answerable", pct(accuracy), accuracy >= 0.90)
-    assert accuracy >= 0.90, f"acerto {accuracy:.0%} < 90% (SC-003); erros: {misses}"
+    assert accuracy >= 0.90, (
+        f"acerto {accuracy:.0%} < 90% (SC-003); erros: {misses}; "
+        f"detalhes em {MISSES.relative_to(ROOT)}"
+    )
 
 
 def test_unanswerable_questions_say_not_found(results: list[dict[str, Any]]) -> None:
