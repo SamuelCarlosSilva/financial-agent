@@ -20,3 +20,5 @@
 {"question": "Tenho R$ 1.000 e o dólar está a R$ 5,25. Quantos dólares consigo comprar?", "expected_result": "190.48"}
 {"question": "Um CDB rende 110% do CDI, com o CDI a 10,65% ao ano. Qual a taxa anual do CDB, em percentual?", "expected_result": "11.72"}
 {"question": "Um rendimento bruto de R$ 1.840 sofre 15% de imposto de renda. Qual o rendimento líquido?", "expected_result": "1564.00"}
+{"question": "Uma taxa de 2% ao mês equivale a quanto ao ano, em juros compostos? Responda em percentual.", "expected_result": "26.82"}
+{"question": "Qual a taxa mensal equivalente a 10% ao ano em juros compostos, em percentual?", "expected_result": "0.80"}
