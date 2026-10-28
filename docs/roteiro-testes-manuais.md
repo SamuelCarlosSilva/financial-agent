@@ -272,7 +272,7 @@ Ao terminar, volte `KEY=""` e reinicie a API sem `API_KEYS`.
 | ID | Passos | Resultado esperado | Ref. |
 |---|---|---|---|
 | RES-01 | `docker compose stop db` e `chat "Quanto está o dólar?"` | `HTTP 503`, `error.code: "upstream_unavailable"`, `Serviço temporariamente indisponível.`, com `request_id`. Sem stack trace no corpo. Log `upstream_unavailable`. Depois `docker compose start db`. | FR-012 |
-| RES-02 | Reinicie a API com `OPENAI_API_KEY=sk-invalida` e envie `chat "Quanto está o dólar?"` | `HTTP 200` com a **mensagem padrão de recusa** e `scope: "out_of_scope"`: na falha do guardrail o sistema recusa por segurança. Log `guardrail_error` com `AuthenticationError` e `chat_turn` com `scope_reason: "guardrail_error"`. A chave inválida não aparece no log. Depois reinicie com a chave certa. | FR-012 |
+| RES-02 | Reinicie a API com `OPENAI_API_KEY=sk-invalida` e envie `chat "Quanto está o dólar?"` | `HTTP 503` com `error.code: "upstream_unavailable"` e a mensagem `Serviço temporariamente indisponível.`: a falha do guardrail não vira recusa e nenhuma ferramenta roda (COR-07). Log `guardrail_error` com `AuthenticationError` seguido de `upstream_unavailable`, sem `chat_turn`. A chave inválida não aparece no log. Depois reinicie com a chave certa. | FR-012 |
 | RES-03 | Depois do RES-01, sem reiniciar a API: `chat "Quanto está o dólar?"` | Volta a `200`: o pool de conexões se recupera sozinho | FR-012 |
 
 ### OBS: logs e rastreabilidade
