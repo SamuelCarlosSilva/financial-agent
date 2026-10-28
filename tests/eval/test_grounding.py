@@ -23,6 +23,7 @@ from tests.eval.common import (
     DOCS_DIR,
     OUT_DIR,
     ROOT,
+    auth_headers,
     has_openai_key,
     ingest_docs,
     load_jsonl,
@@ -99,7 +100,7 @@ def results() -> Iterator[list[dict[str, Any]]]:
 
     texts = chunk_texts()
     rows: list[dict[str, Any]] = []
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(), headers=auth_headers()) as client:
         for case in load_jsonl(DATASET):
             response = client.post("/v1/chat", json={"message": case["question"]})
             # Uma pergunta com erro conta como falha, sem derrubar o eval inteiro.

@@ -35,6 +35,12 @@ def has_openai_key() -> bool:
     return bool(get_settings().OPENAI_API_KEY.get_secret_value())
 
 
+def auth_headers() -> dict[str, str]:
+    """`X-API-Key` com a primeira chave de `API_KEYS`; vazio com a autenticação desligada."""
+    keys = get_settings().API_KEYS
+    return {"X-API-Key": keys[0]} if keys else {}
+
+
 async def ingest_docs() -> None:
     """Reingere `data/docs/` no Postgres do `.env` (a ingestão é idempotente)."""
     settings = get_settings()

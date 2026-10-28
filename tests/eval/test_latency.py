@@ -20,6 +20,7 @@ import pytest
 from financial_agent.api.app import create_app
 from tests.eval.common import (
     OUT_DIR,
+    auth_headers,
     has_openai_key,
     ingest_docs,
     load_jsonl,
@@ -63,7 +64,9 @@ async def measure() -> dict[str, list[dict[str, Any]]]:
     transport = httpx.ASGITransport(app=app)
     async with (
         app.router.lifespan_context(app),
-        httpx.AsyncClient(transport=transport, base_url="http://api", timeout=120) as client,
+        httpx.AsyncClient(
+            transport=transport, base_url="http://api", timeout=120, headers=auth_headers()
+        ) as client,
     ):
         sequential = [await timed_post(client, message) for message in questions()]
         burst = questions()[:CONCURRENCY]
