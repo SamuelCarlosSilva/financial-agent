@@ -21,3 +21,4 @@
 {"turns": ["O que é o FGC?", "Qual o limite de garantia dele por CPF?"], "expected_tool": "search_financial_documents", "expected_args_contains": {"query": [["fgc", "garantidor"]]}, "leak_markers": ["fgc", "garantidor"]}
 {"turns": ["Como funciona a caderneta de poupança?", "E quanto ela rende?"], "expected_tool": "search_financial_documents", "expected_args_contains": {"query": ["poupanca"]}, "leak_markers": ["poupanca"]}
 {"turns": ["Quanto está o dólar?", "E o euro?", "Quanto são 500 disso em reais?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["500"]}, "also_expected": [{"tool": "get_currency_quote", "args_contains": {"base": ["EUR"]}}], "leak_markers": ["EUR"]}
+{"turns": ["Quanto está o dólar hoje?", "Quanto são 150 dessa moeda em reais?"], "expected_tool": "calculate", "expected_args_contains": {"expression": ["150"]}, "leak_markers": ["USD"], "also_expected": [{"tool": "get_currency_quote", "args_contains": {"base": ["USD"]}}]}

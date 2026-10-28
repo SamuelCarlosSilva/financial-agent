@@ -17,7 +17,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from financial_agent.api.app import create_app
-from tests.eval.common import OUT_DIR, ROOT, has_openai_key, load_jsonl, pct, record_metric
+from tests.eval.common import (
+    OUT_DIR,
+    ROOT,
+    auth_headers,
+    has_openai_key,
+    load_jsonl,
+    pct,
+    record_metric,
+)
 
 pytestmark = pytest.mark.eval
 
@@ -52,7 +60,7 @@ def results() -> Iterator[list[dict[str, Any]]]:
         pytest.skip("OPENAI_API_KEY não configurada")
 
     rows: list[dict[str, Any]] = []
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(), headers=auth_headers()) as client:
         for case in load_jsonl(DATASET):
             response = client.post("/v1/chat", json={"message": case["question"]})
             # Uma pergunta com erro conta como falha, sem derrubar o eval inteiro.

@@ -10,6 +10,7 @@ from langgraph.errors import GraphRecursionError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from financial_agent.api.schemas import ErrorBody, ErrorDetail
+from financial_agent.errors import UpstreamUnavailableError
 from financial_agent.logging import get_logger, request_id_var
 
 log = get_logger(__name__)
@@ -23,12 +24,6 @@ class NotFoundError(Exception):
 
 class UnauthorizedError(Exception):
     def __init__(self, message: str = "X-API-Key ausente ou inválida.") -> None:
-        super().__init__(message)
-        self.message = message
-
-
-class UpstreamUnavailableError(Exception):
-    def __init__(self, message: str = "Serviço temporariamente indisponível.") -> None:
         super().__init__(message)
         self.message = message
 

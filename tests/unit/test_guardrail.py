@@ -10,6 +10,7 @@ from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
 from financial_agent.api.app import create_app
+from financial_agent.errors import UpstreamUnavailableError
 from financial_agent.graph.builder import RECURSION_LIMIT, build_graph
 from financial_agent.graph.nodes.guardrail import make_guardrail_node, route_after_guardrail
 from financial_agent.graph.prompts import (
@@ -82,13 +83,12 @@ async def test_ambiguous_asks_for_clarification() -> None:
     assert llm.calls == []
 
 
-async def test_classifier_failure_falls_back_to_out_of_scope() -> None:
+async def test_classifier_failure_is_reported_as_unavailable() -> None:
     llm = agent_llm()
 
-    state = await run(TimeoutError("openai"), llm)
+    with pytest.raises(UpstreamUnavailableError):
+        await run(TimeoutError("openai"), llm)
 
-    assert state["scope"] == ScopeDecision(label="out_of_scope", reason="guardrail_error")
-    assert state["messages"][-1].content == OUT_OF_SCOPE_MESSAGE
     assert llm.calls == []
 
 
@@ -120,6 +120,19 @@ def test_chat_endpoint_reports_refusal() -> None:
     assert body["scope"] == "out_of_scope"
     assert body["answer"] == OUT_OF_SCOPE_MESSAGE
     assert body["sources"] == []
+
+
+def test_chat_endpoint_reports_classifier_failure_as_unavailable() -> None:
+    guardrail = make_guardrail_node(fake_guardrail(TimeoutError("openai")))
+    graph = build_graph(InMemorySaver(), agent_llm(), tools=[fake_calc], guardrail=guardrail)
+
+    with TestClient(create_app(graph=graph), raise_server_exceptions=False) as client:
+        response = client.post("/v1/chat", json={"message": "Quanto está o dólar?"})
+
+    assert response.status_code == 503
+    error = response.json()["error"]
+    assert error["code"] == "upstream_unavailable"
+    assert error["message"] == "Serviço temporariamente indisponível."
 
 
 async def test_advice_request_gets_disclaimer_when_agent_omits_it() -> None:

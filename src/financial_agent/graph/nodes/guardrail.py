@@ -8,6 +8,7 @@ from typing import Any, Literal, Protocol
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
+from financial_agent.errors import UpstreamUnavailableError
 from financial_agent.graph.prompts import ADVICE_CHECK_PROMPT, GUARDRAIL_SYSTEM_PROMPT
 from financial_agent.graph.state import AdviceCheck, GraphState, ScopeDecision
 from financial_agent.logging import get_logger, truncate
@@ -21,8 +22,6 @@ HISTORY_MESSAGE_CHARS = 500
 
 # O texto do usuário não pode abrir nem fechar os delimitadores do prompt.
 _DELIMITER = re.compile(r"<\s*/?\s*(?:mensagem_usuario|historico)\s*>", re.IGNORECASE)
-
-GUARDRAIL_ERROR = ScopeDecision(label="out_of_scope", reason="guardrail_error")
 
 
 class GuardrailNode(Protocol):
@@ -72,9 +71,10 @@ def make_guardrail_node(llm: BaseChatModel) -> GuardrailNode:
             if not isinstance(decision, ScopeDecision):
                 decision = ScopeDecision.model_validate(decision)
         except Exception as exc:
-            # Na dúvida, recusa: nenhuma ferramenta roda sem uma classificação válida.
+            # Nenhuma ferramenta roda sem uma classificação válida, mas a falha sai como
+            # indisponibilidade (503), e não como uma recusa que parece intencional (FR-012).
             log.warning("guardrail_error", error=type(exc).__name__)
-            return GUARDRAIL_ERROR
+            raise UpstreamUnavailableError() from exc
         return decision
 
     async def is_advice_request(user_input: str) -> bool:
