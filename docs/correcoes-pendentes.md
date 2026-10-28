@@ -2,7 +2,7 @@
 
 ## COR-01: resposta trocada por "Não encontrei" ao reaproveitar o histórico
 
-**Status:** aplicada na branch `fix/agent-forced-tool-call` (falta a verificação manual na API).
+**Status:** na `main` (veio da branch `fix/agent-forced-tool-call`) (falta a verificação manual na API).
 
 **Sintoma.** `chat "O que é come-cotas?"` pelo `/docs` devolve
 `Não encontrei essa informação nas fontes disponíveis.` com `sources: []`, mas o log mostra que
@@ -63,7 +63,7 @@ thread nova (sem `thread_id`) antes de abrir bugs separados.
 
 ## COR-02: `api.log` fora do controle de versão
 
-**Status:** aplicada na branch `fix/agent-forced-tool-call` (`*.log` no `.gitignore`).
+**Status:** na `main` (veio da branch `fix/agent-forced-tool-call`) (`*.log` no `.gitignore`).
 
 O `api.log` (saída do uvicorn usada nos testes manuais) aparece como arquivo não rastreado no
 `git status`. Adicionar ao `.gitignore`, de preferência com o padrão `*.log`, para cobrir
@@ -71,7 +71,7 @@ outros logs locais.
 
 ## COR-03: evals falham com 401 quando `API_KEYS` está definido
 
-**Status:** pendente (encontrada em 2026-10-20, ao rodar o eval da branch `002-api-document-marker`).
+**Status:** resolvida em 2026-10-27 (`auth_headers()` em `tests/eval/common.py`, usado nos seis evals, `test_latency.py` incluído). Encontrada em 2026-10-20, ao rodar o eval da branch `002-api-document-marker`.
 
 **Sintoma.** Com `API_KEYS` preenchido no `.env`, `uv run pytest -m eval` devolve
 `401 unauthorized` ("X-API-Key ausente ou inválida.") em todas as perguntas. Os testes de
@@ -97,7 +97,10 @@ usado nos cinco arquivos como `TestClient(create_app(), headers=auth_headers())`
 
 ## COR-04: eval de fundamentação não mostra por que uma pergunta errou
 
-**Status:** pendente (encontrada em 2026-10-20).
+**Status:** resolvida em 2026-10-27: o eval grava `tests/eval/out/grounding_misses.jsonl` com
+`missing_facts`, `expected_source` e `source_cited` de cada pergunta reprovada (`miss_details`, a
+mesma regra do teste de acerto). Encontrada em 2026-10-20. A comparação com a `main`, abaixo,
+continua pendente.
 
 **Sintoma.** `test_answerable_questions_accuracy` deu 88,5% (23/26, meta 90%) e falhou em
 "Como funciona a tributação de fundos de renda fixa de curto prazo?", "O que é o CDI?" e
@@ -143,3 +146,53 @@ variável (`set $upstream ${API_UPSTREAM};`), ajustando o `rewrite` de `/api/v1/
 já que `proxy_pass` com variável não troca o prefixo da URI. Alternativa simples: documentar que
 o `web` deve ser reiniciado junto com a API.
 
+
+## COR-07: falha do guardrail vira recusa
+
+**Status:** resolvida em 2026-10-27.
+
+**Sintoma.** Com o classificador de escopo fora do ar (chave inválida, timeout, resposta que não
+valida), o `/v1/chat` devolvia `HTTP 200` com a mensagem padrão de recusa e `scope:
+"out_of_scope"` (RES-02). Para o usuário, uma falha técnica parecia uma recusa intencional.
+
+**Causa.** `classify` (`graph/nodes/guardrail.py`) capturava qualquer exceção e devolvia
+`ScopeDecision(label="out_of_scope", reason="guardrail_error")`.
+
+**Correção.** O `except` mantém o log `guardrail_error` e levanta `UpstreamUnavailableError`
+(movida para `financial_agent/errors.py`, reexportada em `api/errors.py`), que já sai como
+`503 upstream_unavailable` ("Serviço temporariamente indisponível."). Nenhuma ferramenta roda e o
+front já trata o 503 como falha transitória, com "Tentar de novo". A checagem de recomendação
+continua tolerante: sem ela, o aviso ainda vem da regra 6 do prompt.
+
+**Efeito conhecido.** Como em qualquer falha do agente, a mensagem do usuário fica no checkpoint
+sem resposta.
+
+## COR-08: "disso" em conversões nem sempre vira a moeda certa
+
+**Status:** resolvida em 2026-10-27 (só prompt; falta rodar o eval de follow-up).
+
+**Sintoma.** Em "Quanto são 500 disso em reais?", o agente às vezes chama as ferramentas sem
+antes resolver a referência para a moeda da conversa.
+
+**Causa.** A regra 4 do `AGENT_SYSTEM_PROMPT` dizia que "disso" aponta para a última moeda, mas
+só no fim da regra, depois das instruções de chamada.
+
+**Correção.** A regra 4 começa pela resolução: antes de chamar qualquer ferramenta, trocar
+"disso", "dessa moeda" ou "dela" pela moeda mencionada por último e, sem moeda na conversa,
+perguntar qual é em vez de supor. Sem exemplo com moeda concreta: na primeira versão o exemplo
+"500 disso … euro → EUR" fez a thread de controle do eval (sem histórico) converter euros, e
+`test_no_context_leaks_across_threads` acusou vazamento. Não garante 100%; os casos de
+`followup.jsonl` medem. Caso novo: dólar →
+"Quanto são 150 dessa moeda em reais?".
+
+## COR-09: taxa equivalente montada sem parênteses
+
+**Status:** resolvida em 2026-10-27 (só prompt; falta rodar o eval de cálculo).
+
+**Sintoma.** Em conversões de taxa, o LLM montava `(1 + 0.01) ** 12 - 1 * 100` (= -98.87) em vez
+de `((1 + 0.01) ** 12 - 1) * 100` (= 12.68).
+
+**Correção.** A regra 3 explica que * é feito antes de - e traz o par certo/errado, mais um
+exemplo de anual para mensal (`((1 + 0.12) ** (1 / 12) - 1) * 100 = 0.95`). Casos novos em
+`calc.jsonl`, com números diferentes dos exemplos do prompt: 2% ao mês → 26.82% ao ano e 10% ao
+ano → 0.80% ao mês.
